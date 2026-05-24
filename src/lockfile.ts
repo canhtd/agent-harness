@@ -56,7 +56,14 @@ async function removeExitCode(issueId: string): Promise<void> {
   await fs.unlink(path.join(LOCKS, `${issueId}.exit`)).catch(() => {})
 }
 
-export async function cleanup(): Promise<void> {
+export interface FinishedAgent {
+  issueId: string
+  identifier: string
+  exitCode: number
+}
+
+export async function cleanup(): Promise<FinishedAgent[]> {
+  const finished: FinishedAgent[] = []
   for (const f of await fs.readdir(LOCKS).catch(() => [] as string[])) {
     if (!f.endsWith('.json')) continue
     const issueId = f.replace('.json', '')
@@ -70,6 +77,7 @@ export async function cleanup(): Promise<void> {
     if (exitCode === 0) {
       await removeLock(issueId)
       log.info({ issueId: lock.issueId, issueIdentifier: lock.identifier }, 'agent exited cleanly')
+      finished.push({ issueId: lock.issueId, identifier: lock.identifier, exitCode: 0 })
     } else {
       const code = exitCode ?? 1
       const delay = computeBackoff(lock.attempt)
@@ -83,8 +91,10 @@ export async function cleanup(): Promise<void> {
         attempt: lock.attempt,
         notBefore: lock.notBefore,
       }, 'agent crashed, backoff applied')
+      finished.push({ issueId: lock.issueId, identifier: lock.identifier, exitCode: code })
     }
   }
+  return finished
 }
 
 export async function countRunning(): Promise<number> {

@@ -7,19 +7,19 @@ export function sanitize(s: string): string {
   return s.replace(/[^A-Za-z0-9._-]/g, '_')
 }
 
-export async function ensureWorktree(identifier: string): Promise<string> {
+export async function ensureWorktree(identifier: string): Promise<{ path: string; created: boolean }> {
   const key = sanitize(identifier)
   const ws = path.join(WORKSPACES, key)
   try {
     await fs.access(ws)
-    execSync('git fetch origin && git rebase origin/main', { cwd: ws, stdio: 'pipe' })
+    return { path: ws, created: false }
   } catch {
     execSync(`git worktree add "${ws}" -b "agent/${key}" origin/main`, {
       cwd: config.repoPath,
       stdio: 'pipe',
     })
+    return { path: ws, created: true }
   }
-  return ws
 }
 
 export async function removeWorktree(identifier: string): Promise<void> {
