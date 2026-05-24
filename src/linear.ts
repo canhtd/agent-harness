@@ -8,6 +8,43 @@ export interface IssueInfo {
   description?: string | null
 }
 
+const TERMINAL_STATES = ['Done', 'Canceled', 'Cancelled', 'Duplicate']
+
+export async function fetchIssueState(issueId: string): Promise<{ stateName: string; terminal: boolean } | null> {
+  const linear = new LinearClient({ apiKey: config.linearApiKey })
+  try {
+    const issue = await linear.issue(issueId)
+    const state = await issue.state
+    if (!state) return null
+    return { stateName: state.name, terminal: TERMINAL_STATES.includes(state.name) }
+  } catch {
+    return null
+  }
+}
+
+export async function fetchIssueStateByIdentifier(identifier: string): Promise<{ id: string; stateName: string; terminal: boolean } | null> {
+  const match = identifier.match(/^([A-Za-z]+)-(\d+)$/)
+  if (!match) return null
+  const [, teamKey, numStr] = match
+  const linear = new LinearClient({ apiKey: config.linearApiKey })
+  try {
+    const result = await linear.issues({
+      filter: {
+        team: { key: { eq: teamKey } },
+        number: { eq: parseInt(numStr, 10) },
+      },
+      first: 1,
+    })
+    const issue = result.nodes[0]
+    if (!issue) return null
+    const state = await issue.state
+    if (!state) return null
+    return { id: issue.id, stateName: state.name, terminal: TERMINAL_STATES.includes(state.name) }
+  } catch {
+    return null
+  }
+}
+
 export async function fetchCandidates(): Promise<IssueInfo[]> {
   const linear = new LinearClient({ apiKey: config.linearApiKey })
   const filter: Record<string, unknown> = {

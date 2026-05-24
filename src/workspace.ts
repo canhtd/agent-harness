@@ -22,6 +22,15 @@ export async function ensureWorktree(identifier: string): Promise<string> {
   return ws
 }
 
+export async function listWorktreeIdentifiers(): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(WORKSPACES, { withFileTypes: true })
+    return entries.filter((e) => e.isDirectory()).map((e) => e.name)
+  } catch {
+    return []
+  }
+}
+
 export async function removeWorktree(identifier: string): Promise<void> {
   const key = sanitize(identifier)
   const ws = path.join(WORKSPACES, key)

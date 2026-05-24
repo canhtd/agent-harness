@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
-import { readLock, writeLock, isAlive, cleanup, countRunning } from './lockfile.js'
-import { fetchCandidates } from './linear.js'
-import { ensureWorktree } from './workspace.js'
+import { readLock, writeLock, isAlive, cleanup, countRunning, listLocks, removeLock } from './lockfile.js'
+import { fetchCandidates, fetchIssueState, fetchIssueStateByIdentifier } from './linear.js'
+import { ensureWorktree, removeWorktree, listWorktreeIdentifiers } from './workspace.js'
 import { spawnAgent } from './runner.js'
 
 export async function tick(): Promise<void> {
@@ -12,6 +12,7 @@ export async function tick(): Promise<void> {
     await fs.mkdir(dir, { recursive: true })
 
   await cleanup()
+  await reconcileTerminal()
 
   const running = await countRunning()
   const slots = config.maxConcurrent - running
@@ -51,4 +52,40 @@ export async function tick(): Promise<void> {
     { dispatched: Math.min(candidates.length, slots), running: running + Math.min(candidates.length, slots) },
     'tick complete',
   )
+}
+
+async function reconcileTerminal(): Promise<void> {
+  const locks = await listLocks()
+  const lockedIdentifiers = new Set(locks.map((l) => l.identifier))
+
+  for (const lock of locks) {
+    try {
+      const result = await fetchIssueState(lock.issueId)
+      if (!result?.terminal) continue
+
+      log.info({ issueId: lock.issueId, issueIdentifier: lock.identifier, state: result.stateName }, 'terminal cleanup')
+
+      if (isAlive(lock.pid)) {
+        try { process.kill(lock.pid, 'SIGTERM') } catch {}
+      }
+      await removeLock(lock.issueId)
+      try { removeWorktree(lock.identifier) } catch {}
+    } catch (err) {
+      log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, error: String(err) }, 'terminal reconcile failed')
+    }
+  }
+
+  const workspaces = await listWorktreeIdentifiers()
+  for (const ws of workspaces) {
+    if (lockedIdentifiers.has(ws)) continue
+    try {
+      const result = await fetchIssueStateByIdentifier(ws)
+      if (!result?.terminal) continue
+
+      log.info({ issueId: result.id, issueIdentifier: ws, state: result.stateName }, 'terminal cleanup')
+      try { removeWorktree(ws) } catch {}
+    } catch (err) {
+      log.warn({ issueIdentifier: ws, error: String(err) }, 'orphan reconcile failed')
+    }
+  }
 }
