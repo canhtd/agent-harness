@@ -9,6 +9,9 @@ export const config = {
   projectSlug: process.env.LINEAR_PROJECT_SLUG || undefined,
   repoPath: process.env.REPO_PATH || process.cwd(),
   maxConcurrent: 10,
+  sentryAuthToken: process.env.SENTRY_AUTH_TOKEN || undefined,
+  sentryOrg: process.env.SENTRY_ORG || undefined,
+  sentryProject: process.env.SENTRY_PROJECT || undefined,
 }
 
 const BASE = path.join(os.homedir(), '.agent-harness')

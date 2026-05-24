@@ -4,6 +4,7 @@ import { readLock, writeLock, isAlive, cleanup, countRunning } from './lockfile.
 import { fetchCandidates } from './linear.js'
 import { ensureWorktree } from './workspace.js'
 import { spawnAgent } from './runner.js'
+import { pollSentry } from './sentry.js'
 
 export async function tick(): Promise<void> {
   log.info('tick start')
@@ -12,6 +13,12 @@ export async function tick(): Promise<void> {
     await fs.mkdir(dir, { recursive: true })
 
   await cleanup()
+
+  try {
+    await pollSentry()
+  } catch (err) {
+    log.error({ error: String(err) }, 'sentry poll failed')
+  }
 
   const running = await countRunning()
   const slots = config.maxConcurrent - running
