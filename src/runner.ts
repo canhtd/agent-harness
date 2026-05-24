@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { createWriteStream } from 'node:fs'
+import { openSync } from 'node:fs'
 import path from 'node:path'
 import { LOGS } from './config.js'
 import { sanitize } from './workspace.js'
@@ -12,10 +12,10 @@ export interface AgentRunner {
 
 export function spawnAgent(issue: IssueInfo, ws: string): number {
   const prompt = buildPrompt(issue)
-  const out = createWriteStream(path.join(LOGS, `${sanitize(issue.identifier)}.log`), { flags: 'a' })
+  const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'a')
   const child = spawn('claude', ['-p', prompt], {
     cwd: ws,
-    stdio: ['ignore', out, out],
+    stdio: ['ignore', fd, fd],
     detached: true,
     env: { ...process.env },
   })
