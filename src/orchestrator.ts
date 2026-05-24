@@ -4,6 +4,7 @@ import { readLock, writeLock, isAlive, cleanup, countRunning, detectStalls } fro
 import { fetchCandidates } from './linear.js'
 import { ensureWorktree } from './workspace.js'
 import { spawnAgent } from './runner.js'
+import { pollSentry } from './sentry.js'
 
 export async function tick(): Promise<void> {
   log.info('tick start')
@@ -11,6 +12,7 @@ export async function tick(): Promise<void> {
   for (const dir of [LOCKS, WORKSPACES, LOGS])
     await fs.mkdir(dir, { recursive: true })
 
+  await pollSentry()
   await detectStalls()
   await cleanup()
 
