@@ -11,10 +11,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --ignore-scripts
-      - run: pnpm typecheck
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: npx tsc
+
+      - name: Security gate
+        if: github.event_name == 'pull_request'
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
+          BLOCKED=$(echo "$CHANGED" | grep -E '^\.(env|env\..*)$' || true)
+          if [ -n "$BLOCKED" ]; then
+            echo "::error::Blocked: PR modifies protected files: $BLOCKED"
+            exit 1
+          fi

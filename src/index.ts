@@ -1,6 +1,6 @@
 import { LinearClient } from '@linear/sdk'
 import { spawn, execSync } from 'node:child_process'
-import { createWriteStream } from 'node:fs'
+import { openSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
@@ -87,6 +87,9 @@ async function ensureWorktree(identifier: string): Promise<string> {
     await fs.access(ws)
     execSync('git fetch origin && git rebase origin/main', { cwd: ws, stdio: 'pipe' })
   } catch {
+    try {
+      execSync(`git branch -D "agent/${key}"`, { cwd: config.repoPath, stdio: 'pipe' })
+    } catch { /* branch doesn't exist, fine */ }
     execSync(`git worktree add "${ws}" -b "agent/${key}" origin/main`, {
       cwd: config.repoPath,
       stdio: 'pipe',
@@ -104,13 +107,14 @@ function spawnAgent(
     '',
     issue.description || '(no description)',
     '',
-    'Follow CLAUDE.md. Branch, implement, test, create PR.',
+    'Follow CLAUDE.md. You are running autonomously — do not ask for confirmation.',
+    'Steps: implement the task, run pnpm typecheck, git add + commit, git push, create PR with gh pr create.',
   ].join('\n')
 
-  const out = createWriteStream(path.join(LOGS, `${sanitize(issue.identifier)}.log`), { flags: 'a' })
+  const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'a')
   const child = spawn('claude', ['-p', prompt], {
     cwd: ws,
-    stdio: ['ignore', out, out],
+    stdio: ['ignore', fd, fd],
     detached: true,
     env: { ...process.env },
   })

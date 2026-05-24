@@ -49,7 +49,7 @@ Read [GOTCHAS.md](GOTCHAS.md) before starting any task — contains known pitfal
 
 - Modify `.env`, lockfiles format, or CI config without explicit approval
 - Spawn more than 10 concurrent agents
-- Merge PRs without CI pass + human review (v1)
+- Merge PRs without CI pass
 - Put secrets in code — Linear API key comes from environment
 
 ### ALWAYS

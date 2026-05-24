@@ -1,43 +1,57 @@
 # Handoff
 
 ## Current State
-Architecture design xong. Chưa viết code. Sẵn sàng implement Phase 0.
+Phase 0 chạy được. Orchestrator poll Linear, tạo worktree, spawn agent. ENG-8 (module extraction) agent đã implement, PR #1 đang chờ merge.
 
 ## Done
-- [x] Phân tích kiến trúc Creao (Peter Pang) — Grader, Engineering Pipeline, Bridge
-- [x] Phân tích Symphony (OpenAI) — orchestrator spec, dispatch, workspace, retry
-- [x] So sánh CLI vs API agent runtime → chọn CLI (flat cost, tool layer miễn phí)
-- [x] So sánh Rust vs TypeScript → chọn TypeScript (ship nhanh, ecosystem giàu)
-- [x] Quyết định không cần Grader v1 — CI + Sentry + human review đủ
-- [x] Quyết định không cần Bridge v1 — GitHub Actions auto-merge đủ
-- [x] Thiết kế bootstrapping strategy — Phase 0 tự build phần còn lại
-- [x] Viết CLAUDE.md
+- [x] Phân tích kiến trúc Creao + Symphony
+- [x] Chọn stack: TypeScript + Claude Code CLI + lockfile state
+- [x] Implement Phase 0: `src/index.ts` — poll → dispatch → spawn
+- [x] Tạo GitHub repo: https://github.com/canhtd/agent-harness
+- [x] Tạo Linear project "Agent Harness" (team Enginear, key ENG)
+- [x] Tạo 9 backlog issues (ENG-1 → ENG-9) với blocked-by dependencies
+- [x] Test end-to-end: ENG-8 Todo → orchestrator dispatch → agent tách modules → PR #1
+- [x] Viết CLAUDE.md, CONCEPT.md, GOTCHAS.md
 
 ## Tried & Failed
-- Rust ban đầu — chuyển TypeScript vì mục tiêu ship nhanh, không có performance bottleneck cần Rust
+- Rust ban đầu → chuyển TypeScript (không có performance bottleneck cần Rust)
+- `createWriteStream` cho spawn stdio → dùng `openSync` fd thay thế
+- Agent hỏi xác nhận trong `-p` mode → thêm "autonomous, do not ask" vào prompt
 
 ## Decisions
-- **TypeScript** thay Rust — mục tiêu ship nhanh cho internal team
-- **Claude Code CLI** thay API — flat cost, swap sau qua `interface AgentRunner`
-- **Lockfile state** thay DB — stateless mỗi tick, tự recover
-- **GitHub Actions** lo merge/deploy — không build trong Orchestrator
+- **TypeScript** thay Rust — mục tiêu ship nhanh
+- **Claude Code CLI** thay API — flat cost, `interface AgentRunner` để swap sau
+- **Lockfile state** thay DB — stateless, tự recover
+- **GitHub Actions** lo CI + auto-merge — không human review (giống Creao)
 - **Sentry poll** thay webhook — cùng pattern poll-based
-- **Phase 0 bootstrapping** — hệ thống tự build chính nó qua Linear tickets
-- **Không Grader v1** — CI + Sentry + human review là quality gate
-- **Không Bridge v1** — GitHub branch protection + auto-merge
+- **Team-based Linear filter** (`LINEAR_TEAM_KEY=ENG`) thay project slug
+- **ENG-8 trước** — tách modules trước khi dispatch song song (tránh merge conflict)
 
 ## Next Steps
-- [ ] Init TypeScript project (package.json, tsconfig, pnpm)
-- [ ] Implement Phase 0: `src/index.ts` (~150 lines) — poll Linear → check lockfile → tạo worktree → spawn `claude -p`
-- [ ] Tạo Linear project cho agent-harness
-- [ ] Test: 1 issue Todo → agent pick up → PR
-- [ ] Tạo backlog trên Linear cho Phase 1-9 (retry, stall, Sentry, hooks, ordering...)
-- [ ] Dùng agent-harness build phần còn lại
+- [ ] Review + merge PR #1 (ENG-8: module extraction)
+- [ ] Commit fixes vào main: spawn fd fix, stale branch fix, autonomous prompt
+- [ ] Setup GitHub Actions CI (typecheck + lint)
+- [ ] Setup auto-merge (branch protection: require CI, no review required)
+- [ ] Kéo ENG-1→6, ENG-9 sang Todo → orchestrator tự dispatch
+- [ ] Sau khi features merge: setup cron hoặc polling loop cho orchestrator
+
+## Backlog (Linear)
+
+| ID | Title | Priority | Status | Blocked by |
+|-----|-------|----------|--------|------------|
+| ENG-1 | Retry with exponential backoff | High | Backlog | ENG-8 |
+| ENG-2 | Stall detection — kill idle agents | High | Backlog | ENG-8 |
+| ENG-3 | Blocked issue filtering | Medium | Backlog | ENG-8 |
+| ENG-4 | Terminal issue cleanup | Medium | Backlog | ENG-8 |
+| ENG-5 | Rework status support | Medium | Backlog | ENG-8 |
+| ENG-6 | WORKFLOW.md template rendering | Medium | Backlog | ENG-8 |
+| ENG-7 | Workspace hooks | Low | Backlog | ENG-6, ENG-8 |
+| ENG-8 | Extract modules | Low | Todo | — |
+| ENG-9 | Sentry polling | Low | Backlog | ENG-8 |
 
 ## Key Files
 - `CLAUDE.md` — project contract cho agent sessions
-- `CONCEPT.md` — architecture overview
-- `src/index.ts` — (sẽ tạo) Phase 0 entry point
-- `~/Documents/creao-architecture.html` — diagram Creao
-- `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/deep-learning/ai-agent/symphony-setup.md` — Symphony setup reference
-- `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/deep-learning/ai-agent/official/codex-symphony.md` — Symphony spec gốc
+- `CONCEPT.md` — architecture overview + diagrams
+- `GOTCHAS.md` — known pitfalls (8 items)
+- `src/index.ts` — Phase 0 entry point (sẽ thành entry-only sau ENG-8 merge)
+- `~/.agent-harness/` — locks, logs, workspaces (runtime state)
