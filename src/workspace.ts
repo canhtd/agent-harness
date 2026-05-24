@@ -30,3 +30,18 @@ export async function removeWorktree(identifier: string): Promise<void> {
     stdio: 'pipe',
   })
 }
+
+export async function resetWorktree(identifier: string): Promise<string> {
+  const key = sanitize(identifier)
+  const ws = path.join(WORKSPACES, key)
+  const branch = `agent/${key}`
+
+  try { execSync(`git worktree remove "${ws}" --force`, { cwd: config.repoPath, stdio: 'pipe' }) } catch { /* may not exist */ }
+  try { execSync(`git branch -D "${branch}"`, { cwd: config.repoPath, stdio: 'pipe' }) } catch { /* may not exist */ }
+
+  execSync(`git worktree add "${ws}" -b "${branch}" origin/main`, {
+    cwd: config.repoPath,
+    stdio: 'pipe',
+  })
+  return ws
+}

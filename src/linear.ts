@@ -6,13 +6,14 @@ export interface IssueInfo {
   identifier: string
   title: string
   description?: string | null
+  stateName: string
 }
 
 export async function fetchCandidates(): Promise<IssueInfo[]> {
   const linear = new LinearClient({ apiKey: config.linearApiKey })
   const filter: Record<string, unknown> = {
     team: { key: { eq: config.teamKey } },
-    state: { name: { in: ['Todo'] } },
+    state: { name: { in: ['Todo', 'Rework'] } },
   }
   if (config.projectSlug) {
     filter.project = { slugId: { eq: config.projectSlug } }
@@ -27,10 +28,14 @@ export async function fetchCandidates(): Promise<IssueInfo[]> {
     return a.identifier.localeCompare(b.identifier)
   })
 
-  return sorted.map((issue) => ({
-    id: issue.id,
-    identifier: issue.identifier,
-    title: issue.title,
-    description: issue.description,
+  return Promise.all(sorted.map(async (issue) => {
+    const state = await issue.state
+    return {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description,
+      stateName: state?.name ?? 'Todo',
+    }
   }))
 }

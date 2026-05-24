@@ -9,6 +9,7 @@ export const config = {
   projectSlug: process.env.LINEAR_PROJECT_SLUG || undefined,
   repoPath: process.env.REPO_PATH || process.cwd(),
   maxConcurrent: 10,
+  maxRework: 2,
 }
 
 const BASE = path.join(os.homedir(), '.agent-harness')
