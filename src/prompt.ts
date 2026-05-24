@@ -3,12 +3,12 @@ import path from 'node:path'
 import { Liquid } from 'liquidjs'
 import type { IssueInfo } from './linear.js'
 
-interface WorkflowFile {
+export interface WorkflowFile {
   config: Record<string, string>
   body: string
 }
 
-function parseFrontMatter(content: string): WorkflowFile {
+export function parseFrontMatter(content: string): WorkflowFile {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
   if (!match) return { config: {}, body: content }
 
