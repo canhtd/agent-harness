@@ -26,13 +26,33 @@ export async function tick(): Promise<void> {
   const candidates = []
   for (const issue of allCandidates) {
     const lock = await readLock(issue.id)
-    if (lock && isAlive(lock.pid)) continue
+    if (!lock) {
+      candidates.push(issue)
+      continue
+    }
+    if (isAlive(lock.pid)) continue
+    if (lock.exitCode !== undefined && lock.exitCode !== 0 && lock.notBefore) {
+      if (Date.now() < new Date(lock.notBefore).getTime()) {
+        log.info({
+          issueId: issue.id,
+          issueIdentifier: issue.identifier,
+          attempt: lock.attempt,
+          notBefore: lock.notBefore,
+        }, 'skipping: in backoff')
+        continue
+      }
+    }
     candidates.push(issue)
   }
 
   for (const issue of candidates.slice(0, slots)) {
     try {
-      log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'dispatching')
+      const prevLock = await readLock(issue.id)
+      const attempt = prevLock?.exitCode !== undefined && prevLock.exitCode !== 0
+        ? prevLock.attempt + 1
+        : 1
+
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, attempt }, 'dispatching')
       const ws = await ensureWorktree(issue.identifier)
       const pid = spawnAgent(issue, ws)
       await writeLock({
@@ -40,9 +60,9 @@ export async function tick(): Promise<void> {
         issueId: issue.id,
         identifier: issue.identifier,
         startedAt: new Date().toISOString(),
-        attempt: 1,
+        attempt,
       })
-      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid }, 'agent spawned')
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, attempt }, 'agent spawned')
     } catch (err) {
       log.error({ issueIdentifier: issue.identifier, error: String(err) }, 'dispatch failed')
     }

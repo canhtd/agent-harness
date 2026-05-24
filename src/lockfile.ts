@@ -9,6 +9,8 @@ export interface Lock {
   identifier: string
   startedAt: string
   attempt: number
+  exitCode?: number
+  notBefore?: string
 }
 
 export async function readLock(issueId: string): Promise<Lock | null> {
@@ -36,13 +38,51 @@ export function isAlive(pid: number): boolean {
   }
 }
 
+export function computeBackoff(attempt: number): number {
+  return Math.min(10_000 * Math.pow(2, attempt - 1), 300_000)
+}
+
+async function readExitCode(issueId: string): Promise<number | null> {
+  try {
+    const content = await fs.readFile(path.join(LOCKS, `${issueId}.exit`), 'utf-8')
+    const code = parseInt(content.trim(), 10)
+    return Number.isNaN(code) ? null : code
+  } catch {
+    return null
+  }
+}
+
+async function removeExitCode(issueId: string): Promise<void> {
+  await fs.unlink(path.join(LOCKS, `${issueId}.exit`)).catch(() => {})
+}
+
 export async function cleanup(): Promise<void> {
   for (const f of await fs.readdir(LOCKS).catch(() => [] as string[])) {
     if (!f.endsWith('.json')) continue
-    const lock = await readLock(f.replace('.json', ''))
-    if (lock && !isAlive(lock.pid)) {
-      log.info({ issueId: lock.issueId, issueIdentifier: lock.identifier }, 'dead lock cleaned')
-      await removeLock(lock.issueId)
+    const issueId = f.replace('.json', '')
+    const lock = await readLock(issueId)
+    if (!lock || isAlive(lock.pid)) continue
+    if (lock.exitCode !== undefined) continue
+
+    const exitCode = await readExitCode(issueId)
+    await removeExitCode(issueId)
+
+    if (exitCode === 0) {
+      await removeLock(issueId)
+      log.info({ issueId: lock.issueId, issueIdentifier: lock.identifier }, 'agent exited cleanly')
+    } else {
+      const code = exitCode ?? 1
+      const delay = computeBackoff(lock.attempt)
+      lock.exitCode = code
+      lock.notBefore = new Date(Date.now() + delay).toISOString()
+      await writeLock(lock)
+      log.info({
+        issueId: lock.issueId,
+        issueIdentifier: lock.identifier,
+        exitCode: code,
+        attempt: lock.attempt,
+        notBefore: lock.notBefore,
+      }, 'agent crashed, backoff applied')
     }
   }
 }
