@@ -87,6 +87,16 @@ export async function cleanup(): Promise<void> {
   }
 }
 
+export async function listLocks(): Promise<Lock[]> {
+  const locks: Lock[] = []
+  for (const f of await fs.readdir(LOCKS).catch(() => [] as string[])) {
+    if (!f.endsWith('.json')) continue
+    const lock = await readLock(f.replace('.json', ''))
+    if (lock) locks.push(lock)
+  }
+  return locks
+}
+
 export async function countRunning(): Promise<number> {
   let n = 0
   for (const f of await fs.readdir(LOCKS).catch(() => [] as string[])) {
