@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
-import { readLock, writeLock, isAlive, cleanup, countRunning } from './lockfile.js'
+import { readLock, writeLock, isAlive, cleanup, countRunning, detectStalls } from './lockfile.js'
 import { fetchCandidates } from './linear.js'
 import { ensureWorktree } from './workspace.js'
 import { spawnAgent } from './runner.js'
@@ -11,6 +11,7 @@ export async function tick(): Promise<void> {
   for (const dir of [LOCKS, WORKSPACES, LOGS])
     await fs.mkdir(dir, { recursive: true })
 
+  await detectStalls()
   await cleanup()
 
   const running = await countRunning()
