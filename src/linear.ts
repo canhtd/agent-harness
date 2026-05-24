@@ -6,6 +6,8 @@ export interface IssueInfo {
   identifier: string
   title: string
   description?: string | null
+  priority?: number | null
+  labels: string[]
 }
 
 export async function fetchCandidates(): Promise<IssueInfo[]> {
@@ -27,10 +29,17 @@ export async function fetchCandidates(): Promise<IssueInfo[]> {
     return a.identifier.localeCompare(b.identifier)
   })
 
-  return sorted.map((issue) => ({
-    id: issue.id,
-    identifier: issue.identifier,
-    title: issue.title,
-    description: issue.description,
-  }))
+  return await Promise.all(
+    sorted.map(async (issue) => {
+      const labels = await issue.labels()
+      return {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description,
+        priority: issue.priority ?? null,
+        labels: labels.nodes.map((l) => l.name),
+      }
+    }),
+  )
 }

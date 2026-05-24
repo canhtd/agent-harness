@@ -7,11 +7,11 @@ import { buildPrompt } from './prompt.js'
 import type { IssueInfo } from './linear.js'
 
 export interface AgentRunner {
-  spawn(issue: IssueInfo, workspacePath: string): number
+  spawn(issue: IssueInfo, workspacePath: string): Promise<number>
 }
 
-export function spawnAgent(issue: IssueInfo, ws: string): number {
-  const prompt = buildPrompt(issue)
+export async function spawnAgent(issue: IssueInfo, ws: string, attempt?: number | null): Promise<number> {
+  const prompt = await buildPrompt(issue, ws, attempt)
   const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'a')
   const child = spawn('claude', ['-p', prompt], {
     cwd: ws,
