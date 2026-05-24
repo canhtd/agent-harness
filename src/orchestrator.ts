@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
-import { readLock, writeLock, isAlive, cleanup, countRunning, detectStalls } from './lockfile.js'
+import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls } from './lockfile.js'
 import { fetchCandidates } from './linear.js'
 import { ensureWorktree } from './workspace.js'
 import { spawnAgent } from './runner.js'
@@ -45,14 +45,28 @@ export async function tick(): Promise<void> {
     candidates.push(issue)
   }
 
-  for (const issue of candidates.slice(0, slots)) {
+  let reworkRunning = await countRunningByState('Rework')
+  let dispatched = 0
+
+  for (const issue of candidates) {
+    if (dispatched >= slots) break
+
+    if (issue.stateName === 'Rework' && reworkRunning >= config.maxRework) {
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, reworkRunning }, 'rework slots full')
+      continue
+    }
+
     try {
       const prevLock = await readLock(issue.id)
       const attempt = prevLock?.exitCode !== undefined && prevLock.exitCode !== 0
         ? prevLock.attempt + 1
         : 1
 
-      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, attempt }, 'dispatching')
+      const isRework = issue.stateName === 'Rework'
+      log.info(
+        { issueId: issue.id, issueIdentifier: issue.identifier, attempt },
+        isRework ? 'dispatching rework' : 'dispatching',
+      )
       const ws = await ensureWorktree(issue.identifier)
       const pid = spawnAgent(issue, ws)
       await writeLock({
@@ -61,15 +75,18 @@ export async function tick(): Promise<void> {
         identifier: issue.identifier,
         startedAt: new Date().toISOString(),
         attempt,
+        stateName: issue.stateName,
       })
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, attempt }, 'agent spawned')
+      dispatched++
+      if (isRework) reworkRunning++
     } catch (err) {
       log.error({ issueIdentifier: issue.identifier, error: String(err) }, 'dispatch failed')
     }
   }
 
   log.info(
-    { dispatched: Math.min(candidates.length, slots), running: running + Math.min(candidates.length, slots) },
+    { dispatched, running: running + dispatched },
     'tick complete',
   )
 }

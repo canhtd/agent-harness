@@ -6,6 +6,7 @@ export interface IssueInfo {
   identifier: string
   title: string
   description?: string | null
+  stateName: string
 }
 
 const TERMINAL_STATES = new Set(['Done', 'Canceled', 'Duplicate'])
@@ -35,7 +36,7 @@ export async function fetchCandidates(): Promise<IssueInfo[]> {
   const linear = createClient()
   const filter: Record<string, unknown> = {
     team: { key: { eq: config.teamKey } },
-    state: { name: { in: ['Todo'] } },
+    state: { name: { in: ['Todo', 'Rework'] } },
   }
   if (config.projectSlug) {
     filter.project = { slugId: { eq: config.projectSlug } }
@@ -60,11 +61,13 @@ export async function fetchCandidates(): Promise<IssueInfo[]> {
       )
       continue
     }
+    const state = await issue.state
     candidates.push({
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
       description: issue.description,
+      stateName: state?.name ?? 'Todo',
     })
   }
 
