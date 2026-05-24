@@ -6,6 +6,8 @@ export interface IssueInfo {
   identifier: string
   title: string
   description?: string | null
+  priority?: number
+  labels: string[]
 }
 
 const TERMINAL_STATES = new Set(['Done', 'Canceled', 'Duplicate'])
@@ -60,11 +62,14 @@ export async function fetchCandidates(): Promise<IssueInfo[]> {
       )
       continue
     }
+    const labelNodes = await issue.labels()
     candidates.push({
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
       description: issue.description,
+      priority: issue.priority,
+      labels: labelNodes.nodes.map((l) => l.name),
     })
   }
 
