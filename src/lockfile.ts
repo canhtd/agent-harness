@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { LOCKS, log } from './config.js'
+import { config, LOCKS, LOGS, log } from './config.js'
+import { sanitize } from './workspace.js'
 
 export interface Lock {
   pid: number
@@ -54,4 +55,34 @@ export async function countRunning(): Promise<number> {
     if (lock && isAlive(lock.pid)) n++
   }
   return n
+}
+
+export async function detectStalls(): Promise<void> {
+  for (const f of await fs.readdir(LOCKS).catch(() => [] as string[])) {
+    if (!f.endsWith('.json')) continue
+    const lock = await readLock(f.replace('.json', ''))
+    if (!lock || !isAlive(lock.pid)) continue
+
+    const logPath = path.join(LOGS, `${sanitize(lock.identifier)}.log`)
+    let mtime: Date
+    try {
+      const stat = await fs.stat(logPath)
+      mtime = stat.mtime
+    } catch {
+      mtime = new Date(lock.startedAt)
+    }
+
+    const idleMs = Date.now() - mtime.getTime()
+    if (idleMs < config.stallTimeoutMs) continue
+
+    log.warn(
+      { issueId: lock.issueId, issueIdentifier: lock.identifier, idleMs },
+      'agent stalled',
+    )
+
+    try {
+      process.kill(lock.pid, 'SIGKILL')
+    } catch {}
+    await removeLock(lock.issueId)
+  }
 }
