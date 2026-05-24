@@ -12,6 +12,7 @@
   "dependencies": {
     "@linear/sdk": "^29.0.0",
     "dotenv": "^16.4.0",
+    "liquidjs": "^10.27.0",
     "pino": "^9.0.0"
   },
   "devDependencies": {

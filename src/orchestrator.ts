@@ -54,7 +54,7 @@ export async function tick(): Promise<void> {
 
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, attempt }, 'dispatching')
       const ws = await ensureWorktree(issue.identifier)
-      const pid = spawnAgent(issue, ws)
+      const pid = await spawnAgent(issue, ws, attempt)
       await writeLock({
         pid,
         issueId: issue.id,
