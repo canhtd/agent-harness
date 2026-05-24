@@ -2,9 +2,9 @@
 
 Lỗi đã gặp trong quá trình build. Đọc trước khi làm bất kỳ task nào.
 
-## Blocked issues chưa được filter
+## Blocked issues được filter qua inverseRelations
 
-Orchestrator hiện tại KHÔNG check `blocked_by` relations trên Linear. Nếu kéo nhiều issues sang Todo mà có dependency giữa chúng, tất cả sẽ được dispatch cùng lúc. Workaround: chỉ kéo issues không bị block sang Todo. Fix: ENG-3.
+`fetchCandidates()` check `inverseRelations` (type `blocks`) cho mỗi issue. Nếu bất kỳ blocker nào chưa ở terminal state (Done, Canceled, Duplicate), issue bị skip. Log entry: `issue blocked` kèm blocker identifiers. Fixed: ENG-3.
 
 ## Nhiều agents sửa cùng file = merge conflict
 
