@@ -41,15 +41,40 @@ function defaultPrompt(issue: IssueInfo): string {
   ].join('\n')
 }
 
+function reworkPrompt(issue: IssueInfo): string {
+  return [
+    `Linear issue: ${issue.identifier} — ${issue.title} (REWORK)`,
+    '',
+    issue.description || '(no description)',
+    '',
+    'This issue was previously implemented but the PR was rejected by a reviewer.',
+    'You are running autonomously — do not ask for confirmation.',
+    'Steps:',
+    '1. Read CLAUDE.md and GOTCHAS.md',
+    `2. Find the existing PR for this issue using \`gh pr list --head agent/${issue.identifier}\``,
+    '3. Read ALL review comments and requested changes on the PR using `gh pr view <number> --comments`',
+    '4. Close the old PR with `gh pr close <number>`',
+    '5. Create a fresh branch from origin/main — do NOT reuse the old branch',
+    '6. Implement the task from scratch, addressing ALL review feedback',
+    '7. Verify EVERY acceptance criterion in the issue description — do not skip any',
+    '8. Run pnpm typecheck — must pass',
+    '9. git add + commit + push',
+    '10. Create a new PR with gh pr create — reference the old PR and list which review comments are addressed',
+  ].join('\n')
+}
+
 export async function buildPrompt(
   issue: IssueInfo,
   opts: { attempt?: number; repoPath: string },
 ): Promise<string> {
+  const templateFile = issue.stateName === 'Rework' ? 'WORKFLOW_REWORK.md' : 'WORKFLOW.md'
+  const fallback = issue.stateName === 'Rework' ? reworkPrompt : defaultPrompt
+
   let raw: string
   try {
-    raw = await fs.readFile(path.join(opts.repoPath, 'WORKFLOW.md'), 'utf-8')
+    raw = await fs.readFile(path.join(opts.repoPath, templateFile), 'utf-8')
   } catch {
-    return defaultPrompt(issue)
+    return fallback(issue)
   }
 
   const { body } = parseFrontMatter(raw)
@@ -63,6 +88,7 @@ export async function buildPrompt(
       description: issue.description ?? '',
       priority: issue.priority ?? null,
       labels: issue.labels,
+      stateName: issue.stateName,
     },
     attempt: opts.attempt ?? null,
   })
