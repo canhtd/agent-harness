@@ -77,6 +77,12 @@ vi.mock('./hooks.js', () => ({
   runHook: vi.fn(),
 }))
 
+vi.mock('./tokens.js', () => ({
+  findSessionJsonl: vi.fn().mockReturnValue(null),
+  aggregateTokens: vi.fn(),
+  appendTokenRecord: vi.fn(),
+}))
+
 describe('tick health check', () => {
   beforeEach(() => {
     logLines.length = 0
