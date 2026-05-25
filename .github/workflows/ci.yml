@@ -18,3 +18,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --ignore-scripts
       - run: pnpm typecheck
+      - run: pnpm test

@@ -24,7 +24,32 @@ function parseFrontMatter(content: string): WorkflowFile {
   return { config, body: match[2] }
 }
 
+function isBugFix(issue: IssueInfo): boolean {
+  return issue.labels.some((l) => l === 'sentry-auto' || l === 'bug')
+}
+
+function bugFixPrompt(issue: IssueInfo): string {
+  return [
+    `Linear issue: ${issue.identifier} — ${issue.title} (BUG FIX)`,
+    '',
+    issue.description || '(no description)',
+    '',
+    'You are running autonomously — do not ask for confirmation.',
+    'Steps:',
+    '1. Read CLAUDE.md and GOTCHAS.md',
+    '2. Investigate the bug — follow the stack trace, reproduce the error',
+    '3. Write a test that reproduces the bug — the test MUST fail before your fix',
+    '4. Fix the bug',
+    '5. Run the test again — it must now pass',
+    '6. Run the full project test suite (see CLAUDE.md) — all tests must pass',
+    '7. Run pnpm typecheck — must pass',
+    '8. git add + commit + push',
+    '9. Create PR with gh pr create — describe root cause, fix, and test coverage',
+  ].join('\n')
+}
+
 function defaultPrompt(issue: IssueInfo): string {
+  if (isBugFix(issue)) return bugFixPrompt(issue)
   return [
     `Linear issue: ${issue.identifier} — ${issue.title}`,
     '',
@@ -34,10 +59,12 @@ function defaultPrompt(issue: IssueInfo): string {
     'Steps:',
     '1. Read CLAUDE.md and GOTCHAS.md',
     '2. Implement the task',
-    '3. Verify EVERY acceptance criterion in the issue description — do not skip any',
-    '4. Run pnpm typecheck — must pass',
-    '5. git add + commit + push',
-    '6. Create PR with gh pr create — list which acceptance criteria are met in the PR body',
+    '3. Write tests that verify each acceptance criterion — tests are mandatory, not optional',
+    '4. Verify EVERY acceptance criterion in the issue description — do not skip any',
+    '5. Run the project test command (see CLAUDE.md) — all tests must pass',
+    '6. Run pnpm typecheck — must pass',
+    '7. git add + commit + push',
+    '8. Create PR with gh pr create — list which acceptance criteria are met in the PR body',
   ].join('\n')
 }
 
@@ -56,10 +83,12 @@ function reworkPrompt(issue: IssueInfo): string {
     '4. Close the old PR with `gh pr close <number>`',
     '5. Create a fresh branch from origin/main — do NOT reuse the old branch',
     '6. Implement the task from scratch, addressing ALL review feedback',
-    '7. Verify EVERY acceptance criterion in the issue description — do not skip any',
-    '8. Run pnpm typecheck — must pass',
-    '9. git add + commit + push',
-    '10. Create a new PR with gh pr create — reference the old PR and list which review comments are addressed',
+    '7. Write tests that verify each acceptance criterion — tests are mandatory, not optional',
+    '8. Verify EVERY acceptance criterion in the issue description — do not skip any',
+    '9. Run the project test command (see CLAUDE.md) — all tests must pass',
+    '10. Run pnpm typecheck — must pass',
+    '11. git add + commit + push',
+    '12. Create a new PR with gh pr create — reference the old PR and list which review comments are addressed',
   ].join('\n')
 }
 
