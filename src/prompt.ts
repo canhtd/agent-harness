@@ -93,6 +93,24 @@ function reworkPrompt(issue: IssueInfo): string {
 }
 
 export function buildContinuationPrompt(issue: IssueInfo, reason: string): string {
+  const hasReviewFeedback = reason.startsWith('review requested changes')
+
+  const steps: string[] = ['1. Understand what changed since your last run']
+
+  if (hasReviewFeedback) {
+    steps.push('2. Read the review feedback below carefully and address EVERY point')
+    steps.push(`3. If feedback is unclear, read full PR review with \`gh pr view <number> --json reviews\``)
+    steps.push('4. Fix all issues raised in the review')
+    steps.push('5. Run pnpm typecheck — must pass')
+    steps.push('6. git add + commit + push')
+    steps.push('7. Verify the PR is updated or create one if needed')
+  } else {
+    steps.push('2. Fix the issue (rebase if conflicts, fix code if CI failed, recreate PR if closed)')
+    steps.push('3. Run pnpm typecheck — must pass')
+    steps.push('4. git add + commit + push')
+    steps.push('5. Verify the PR is updated or create one if needed')
+  }
+
   return [
     `Linear issue: ${issue.identifier} — ${issue.title} (CONTINUATION)`,
     '',
@@ -101,11 +119,7 @@ export function buildContinuationPrompt(issue: IssueInfo, reason: string): strin
     'You are running autonomously — do not ask for confirmation.',
     'You have context from the previous turn via --continue.',
     'Steps:',
-    '1. Understand what changed since your last run',
-    '2. Fix the issue (rebase if conflicts, fix code if CI failed, recreate PR if closed)',
-    '3. Run pnpm typecheck — must pass',
-    '4. git add + commit + push',
-    '5. Verify the PR is updated or create one if needed',
+    ...steps,
   ].join('\n')
 }
 

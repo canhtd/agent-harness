@@ -1,10 +1,11 @@
 import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
-import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone } from './linear.js'
+import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToBlocked, postComment } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
 import { spawnAgent, spawnContinuation } from './runner.js'
-import { checkPrStatus } from './github.js'
+import type { IssueInfo } from './linear.js'
+import { checkPrStatus, getOpenPrNumber, closePr, fetchLastReviewBody } from './github.js'
 import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
@@ -143,7 +144,30 @@ async function reconcile(): Promise<void> {
 
     const turn = lock ? (lock.turn ?? 1) : 0
     if (turn >= config.maxTurns) {
-      log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, turn, maxTurns: config.maxTurns }, 'max turns reached')
+      const attempt = lock?.attempt ?? 1
+
+      if (attempt < config.maxAttempts) {
+        const prNumber = getOpenPrNumber(issue.identifier)
+        if (prNumber) closePr(prNumber)
+        try { await removeWorktree(issue.identifier) } catch {}
+
+        const nextAttempt = attempt + 1
+        log.info(
+          { issueId: issue.id, issueIdentifier: issue.identifier, attempt: nextAttempt, maxAttempts: config.maxAttempts },
+          `fresh attempt ${nextAttempt}/${config.maxAttempts}`,
+        )
+        await writeLock({
+          pid: 0,
+          issueId: issue.id,
+          identifier: issue.identifier,
+          startedAt: new Date().toISOString(),
+          attempt: nextAttempt,
+          turn: 0,
+          stateName: issue.stateName,
+        })
+      } else {
+        await escalateToHuman(issue, lock)
+      }
       continue
     }
 
@@ -182,26 +206,52 @@ async function reconcile(): Promise<void> {
     if (running + slotsUsed >= config.maxConcurrent) continue
 
     const nextTurn = turn + 1
-    log.info({ issueId: issue.id, issueIdentifier: issue.identifier, turn: nextTurn, reason: outcome.reason }, `re-dispatching turn ${nextTurn}`)
+    const attempt = lock?.attempt ?? 1
+    const isFreshAttempt = turn === 0 && attempt > 1
+
+    log.info(
+      { issueId: issue.id, issueIdentifier: issue.identifier, turn: nextTurn, attempt, reason: outcome.reason },
+      isFreshAttempt ? `re-dispatching fresh attempt ${attempt}/${config.maxAttempts}` : `re-dispatching turn ${nextTurn}`,
+    )
 
     try {
       const { path: ws } = await ensureWorktree(issue.identifier)
-      const pid = await spawnContinuation(issue, ws, outcome.reason)
+      const pid = isFreshAttempt
+        ? await spawnAgent(issue, ws, attempt)
+        : await spawnContinuation(issue, ws, outcome.reason)
       await writeLock({
         pid,
         issueId: issue.id,
         identifier: issue.identifier,
         startedAt: new Date().toISOString(),
-        attempt: 1,
+        attempt,
         turn: nextTurn,
         stateName: issue.stateName,
       })
       slotsUsed++
-      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, turn: nextTurn }, 'agent re-spawned')
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, turn: nextTurn, attempt }, 'agent re-spawned')
     } catch (err) {
       log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 're-dispatch failed')
     }
   }
+}
+
+async function escalateToHuman(issue: IssueInfo, lock: Awaited<ReturnType<typeof readLock>>): Promise<void> {
+  const prNumber = getOpenPrNumber(issue.identifier)
+  let reviewBody = ''
+  if (prNumber) reviewBody = fetchLastReviewBody(prNumber)
+
+  const comment = `Agent hit max attempts (${config.maxAttempts}). Last review feedback:\n\n${reviewBody || '(no review feedback)'}\n\nNeeds human intervention.`
+  await postComment(issue.id, comment)
+  await transitionToBlocked(issue.id)
+
+  if (lock) await removeLock(issue.id)
+  try { await removeWorktree(issue.identifier) } catch {}
+
+  log.warn(
+    { issueId: issue.id, issueIdentifier: issue.identifier, attempt: lock?.attempt ?? 1, maxAttempts: config.maxAttempts },
+    'escalating to human',
+  )
 }
 
 async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
