@@ -127,7 +127,7 @@ describe('reconcile: fresh attempt on max turns', () => {
     expect(vi.mocked(github.closePr)).toHaveBeenCalledWith(42)
     expect(vi.mocked(workspace.removeWorktree)).toHaveBeenCalledWith('ENG-50')
     expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
-      expect.objectContaining({ attempt: 2, turn: 0, pid: 0 }),
+      expect.objectContaining({ attempt: 2, turn: 0, pid: -1, exitCode: 0 }),
     )
 
     const freshLine = logLines.find((l) => l.includes('fresh attempt 2/3'))

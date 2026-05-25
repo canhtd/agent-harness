@@ -157,13 +157,14 @@ async function reconcile(): Promise<void> {
           `fresh attempt ${nextAttempt}/${config.maxAttempts}`,
         )
         await writeLock({
-          pid: 0,
+          pid: -1,
           issueId: issue.id,
           identifier: issue.identifier,
           startedAt: new Date().toISOString(),
           attempt: nextAttempt,
           turn: 0,
           stateName: issue.stateName,
+          exitCode: 0,
         })
       } else {
         await escalateToHuman(issue, lock)
