@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
-import { fetchCandidates, fetchIssueState, fetchIssueStateByIdentifier } from './linear.js'
+import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
-import { spawnAgent } from './runner.js'
+import { spawnAgent, spawnContinuation } from './runner.js'
+import { checkPrStatus } from './github.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
 
@@ -29,6 +30,7 @@ export async function tick(): Promise<void> {
     }
   }
 
+  await reconcile()
   await reconcileTerminal(hooks)
 
   const running = await countRunning()
@@ -98,6 +100,7 @@ export async function tick(): Promise<void> {
         identifier: issue.identifier,
         startedAt: new Date().toISOString(),
         attempt,
+        turn: 1,
         stateName: issue.stateName,
       })
       if (isRework) reworkRunning++
@@ -111,6 +114,68 @@ export async function tick(): Promise<void> {
     { dispatched: Math.min(candidates.length, slots), running: running + Math.min(candidates.length, slots) },
     'tick complete',
   )
+}
+
+async function reconcile(): Promise<void> {
+  const inProgress = await fetchInProgressIssues()
+  const running = await countRunning()
+  let slotsUsed = 0
+
+  for (const issue of inProgress) {
+    const lock = await readLock(issue.id)
+
+    if (lock && isAlive(lock.pid)) continue
+
+    if (lock?.exitCode !== undefined && lock.exitCode !== 0 && lock.notBefore) {
+      if (Date.now() < new Date(lock.notBefore).getTime()) continue
+    }
+
+    const turn = lock ? (lock.turn ?? 1) : 0
+    if (turn >= config.maxTurns) {
+      log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, turn, maxTurns: config.maxTurns }, 'max turns reached')
+      continue
+    }
+
+    log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'reconciling')
+
+    const outcome = checkPrStatus(issue.identifier)
+
+    if (outcome.action === 'done') {
+      await transitionToDone(issue.id)
+      if (lock) await removeLock(issue.id)
+      try { await removeWorktree(issue.identifier) } catch {}
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'PR merged, transitioned to Done')
+      continue
+    }
+
+    if (outcome.action === 'skip') {
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, reason: outcome.reason }, 'skipping')
+      continue
+    }
+
+    if (running + slotsUsed >= config.maxConcurrent) continue
+
+    const nextTurn = turn + 1
+    log.info({ issueId: issue.id, issueIdentifier: issue.identifier, turn: nextTurn, reason: outcome.reason }, `re-dispatching turn ${nextTurn}`)
+
+    try {
+      const { path: ws } = await ensureWorktree(issue.identifier)
+      const pid = await spawnContinuation(issue, ws, outcome.reason)
+      await writeLock({
+        pid,
+        issueId: issue.id,
+        identifier: issue.identifier,
+        startedAt: new Date().toISOString(),
+        attempt: 1,
+        turn: nextTurn,
+        stateName: issue.stateName,
+      })
+      slotsUsed++
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, turn: nextTurn }, 'agent re-spawned')
+    } catch (err) {
+      log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 're-dispatch failed')
+    }
+  }
 }
 
 async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
