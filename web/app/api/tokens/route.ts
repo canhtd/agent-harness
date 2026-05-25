@@ -2,18 +2,7 @@ import { NextResponse } from 'next/server'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-
-export interface TokenRecord {
-  task: string
-  date: string
-  model: string
-  turns: number
-  input_tokens: number
-  output_tokens: number
-  cache_creation_tokens: number
-  cache_read_tokens: number
-  estimated_cost_usd: number
-}
+import type { TokenRecord } from '../../types'
 
 export async function GET() {
   const logPath =
