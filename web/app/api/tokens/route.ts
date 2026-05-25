@@ -2,18 +2,7 @@ import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-
-export interface TokenRecord {
-  session_id: string;
-  task: string;
-  date: string;
-  model: string;
-  turns: number;
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_tokens: number;
-  estimated_cost_usd: number;
-}
+import type { TokenRecord } from "@/app/types";
 
 const DEFAULT_PATH = join(homedir(), ".agent-harness", "logs", "tokens.jsonl");
 

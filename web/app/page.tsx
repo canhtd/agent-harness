@@ -1,18 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-interface TokenRecord {
-  session_id: string;
-  task: string;
-  date: string;
-  model: string;
-  turns: number;
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_tokens: number;
-  estimated_cost_usd: number;
-}
+import type { TokenRecord } from "@/app/types";
 
 type SortKey = keyof TokenRecord;
 type SortDir = "asc" | "desc";
@@ -51,17 +40,24 @@ function costBarWidth(cost: number): number {
 export default function Home() {
   const [sessions, setSessions] = useState<TokenRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
     fetch("/api/tokens")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: { sessions: TokenRecord[] }) => {
         setSessions(data.sessions);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => {
+        setError(e.message);
+        setLoading(false);
+      });
   }, []);
 
   const handleSort = (key: SortKey) => {
@@ -99,6 +95,16 @@ export default function Home() {
     return (
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <p className="text-center text-muted">Loading...</p>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <p className="text-center text-cost-red">
+          Failed to load sessions: {error}
+        </p>
       </main>
     );
   }
