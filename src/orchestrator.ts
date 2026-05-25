@@ -5,6 +5,7 @@ import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStat
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
 import { spawnAgent, spawnContinuation } from './runner.js'
 import { checkPrStatus } from './github.js'
+import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
 
@@ -145,6 +146,21 @@ async function reconcile(): Promise<void> {
       if (lock) await removeLock(issue.id)
       try { await removeWorktree(issue.identifier) } catch {}
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'PR merged, transitioned to Done')
+      continue
+    }
+
+    if (outcome.action === 'review') {
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'triggering review')
+      try {
+        const review = await reviewPr(outcome.prNumber)
+        if (review.approved) {
+          log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review approved — awaiting merge')
+        } else {
+          log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review rejected — will re-dispatch')
+        }
+      } catch (err) {
+        log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'review failed')
+      }
       continue
     }
 

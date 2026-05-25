@@ -6,6 +6,7 @@ export type PrOutcome =
   | { action: 'done' }
   | { action: 'skip'; reason: string }
   | { action: 'redispatch'; reason: string }
+  | { action: 'review'; prNumber: number }
 
 export function checkPrStatus(identifier: string): PrOutcome {
   const branch = `agent/${sanitize(identifier)}`
@@ -54,5 +55,28 @@ export function checkPrStatus(identifier: string): PrOutcome {
     return { action: 'skip', reason: 'CI pending' }
   }
 
-  return { action: 'skip', reason: 'PR open, CI passed — awaiting review' }
+  const reviewState = getReviewState(openPr.number)
+  if (reviewState === 'approved') {
+    return { action: 'skip', reason: 'PR approved — awaiting merge' }
+  }
+  if (reviewState === 'changes_requested') {
+    return { action: 'redispatch', reason: 'review requested changes' }
+  }
+
+  return { action: 'review', prNumber: openPr.number }
+}
+
+function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'none' {
+  try {
+    const raw = execSync(
+      `gh pr view ${prNumber} --json reviews --jq '.reviews | map(.state) | unique'`,
+      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
+    ).toString().trim()
+    const states: string[] = JSON.parse(raw || '[]')
+    if (states.includes('CHANGES_REQUESTED')) return 'changes_requested'
+    if (states.includes('APPROVED')) return 'approved'
+    return 'none'
+  } catch {
+    return 'none'
+  }
 }
