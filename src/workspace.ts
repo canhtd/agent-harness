@@ -3,16 +3,21 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { config, WORKSPACES } from './config.js'
 
+export interface WorkspaceResult {
+  path: string
+  created: boolean
+}
+
 export function sanitize(s: string): string {
   return s.replace(/[^A-Za-z0-9._-]/g, '_')
 }
 
-export async function ensureWorktree(identifier: string): Promise<string> {
+export async function ensureWorktree(identifier: string): Promise<WorkspaceResult> {
   const key = sanitize(identifier)
   const ws = path.join(WORKSPACES, key)
   try {
     await fs.access(ws)
-    execSync('git fetch origin && git rebase origin/main', { cwd: ws, stdio: 'pipe' })
+    return { path: ws, created: false }
   } catch {
     try { execSync(`git worktree remove "${ws}" --force`, { cwd: config.repoPath, stdio: 'pipe' }) } catch { /* no worktree */ }
     try { execSync(`git branch -D "agent/${key}"`, { cwd: config.repoPath, stdio: 'pipe' }) } catch { /* no branch */ }
@@ -20,8 +25,12 @@ export async function ensureWorktree(identifier: string): Promise<string> {
       cwd: config.repoPath,
       stdio: 'pipe',
     })
+    return { path: ws, created: true }
   }
-  return ws
+}
+
+export function workspacePath(identifier: string): string {
+  return path.join(WORKSPACES, sanitize(identifier))
 }
 
 export async function listWorktreeIdentifiers(): Promise<string[]> {
