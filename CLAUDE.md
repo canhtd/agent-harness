@@ -4,6 +4,7 @@
 
 - Install: `pnpm install`
 - Dev: `pnpm dev` (runs orchestrator once, single tick)
+- Test: `pnpm test` (vitest)
 - Typecheck: `pnpm typecheck`
 - Lint: `pnpm lint`
 
