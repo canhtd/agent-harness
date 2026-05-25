@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
-import { readLock, writeLock, isAlive, cleanup, countRunning, detectStalls, listLocks, removeLock } from './lockfile.js'
+import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
 import { fetchCandidates, fetchIssueState, fetchIssueStateByIdentifier } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers } from './workspace.js'
 import { spawnAgent } from './runner.js'
@@ -48,14 +48,25 @@ export async function tick(): Promise<void> {
     candidates.push(issue)
   }
 
+  let reworkRunning = await countRunningByState('Rework')
+
   for (const issue of candidates.slice(0, slots)) {
+    if (issue.stateName === 'Rework' && reworkRunning >= config.maxReworkConcurrent) {
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'rework slots full')
+      continue
+    }
+
     try {
       const prevLock = await readLock(issue.id)
       const attempt = prevLock?.exitCode !== undefined && prevLock.exitCode !== 0
         ? prevLock.attempt + 1
         : 1
 
-      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, attempt }, 'dispatching')
+      const isRework = issue.stateName === 'Rework'
+      log.info(
+        { issueId: issue.id, issueIdentifier: issue.identifier, attempt },
+        isRework ? 'dispatching rework' : 'dispatching',
+      )
       const ws = await ensureWorktree(issue.identifier)
       const pid = await spawnAgent(issue, ws, attempt)
       await writeLock({
@@ -64,7 +75,9 @@ export async function tick(): Promise<void> {
         identifier: issue.identifier,
         startedAt: new Date().toISOString(),
         attempt,
+        stateName: issue.stateName,
       })
+      if (isRework) reworkRunning++
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, attempt }, 'agent spawned')
     } catch (err) {
       log.error({ issueIdentifier: issue.identifier, error: String(err) }, 'dispatch failed')

@@ -11,6 +11,7 @@ export interface Lock {
   attempt: number
   exitCode?: number
   notBefore?: string
+  stateName?: string
 }
 
 export async function readLock(issueId: string): Promise<Lock | null> {
@@ -103,6 +104,16 @@ export async function countRunning(): Promise<number> {
     if (!f.endsWith('.json')) continue
     const lock = await readLock(f.replace('.json', ''))
     if (lock && isAlive(lock.pid)) n++
+  }
+  return n
+}
+
+export async function countRunningByState(stateName: string): Promise<number> {
+  let n = 0
+  for (const f of await fs.readdir(LOCKS).catch(() => [] as string[])) {
+    if (!f.endsWith('.json')) continue
+    const lock = await readLock(f.replace('.json', ''))
+    if (lock && isAlive(lock.pid) && lock.stateName === stateName) n++
   }
   return n
 }
