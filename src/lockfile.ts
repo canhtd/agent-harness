@@ -78,7 +78,8 @@ export async function cleanup(): Promise<CompletedAgent[]> {
     await removeExitCode(issueId)
 
     if (exitCode === 0) {
-      await removeLock(issueId)
+      lock.exitCode = 0
+      await writeLock(lock)
       log.info({ issueId: lock.issueId, issueIdentifier: lock.identifier }, 'agent exited cleanly')
     } else {
       const code = exitCode ?? 1
