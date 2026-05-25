@@ -14,6 +14,27 @@ function makeIssue(overrides: Partial<IssueInfo> = {}): IssueInfo {
   }
 }
 
+describe('continuation prompt', () => {
+  it('includes review body when reason starts with review requested changes', async () => {
+    const { buildContinuationPrompt } = await import('./prompt.js')
+    const issue = makeIssue()
+    const reason = 'review requested changes:\n\nPlease fix the type error in line 42'
+    const prompt = buildContinuationPrompt(issue, reason)
+    expect(prompt).toContain('Please fix the type error in line 42')
+    expect(prompt).toContain('Read the review feedback below carefully and address EVERY point')
+    expect(prompt).toContain('gh pr view <number> --json reviews')
+  })
+
+  it('uses standard steps when reason is not review feedback', async () => {
+    const { buildContinuationPrompt } = await import('./prompt.js')
+    const issue = makeIssue()
+    const prompt = buildContinuationPrompt(issue, 'CI checks failed')
+    expect(prompt).toContain('CI checks failed')
+    expect(prompt).not.toContain('Read the review feedback below carefully')
+    expect(prompt).toContain('Fix the issue')
+  })
+})
+
 describe('prompt routing', () => {
   it('feature issue prompt includes test step', async () => {
     const { buildPrompt } = await import('./prompt.js')
