@@ -1,94 +1,91 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import type { TokenRecord } from "./types"
 
-interface TokenRecord {
-  task: string
-  date: string
-  model: string
-  turns: number
-  input_tokens: number
-  output_tokens: number
-  cache_creation_tokens: number
-  cache_read_tokens: number
-  estimated_cost_usd: number
-}
+type SortKey = keyof TokenRecord
+type SortDir = "asc" | "desc"
 
-type SortKey =
-  | "task"
-  | "date"
-  | "model"
-  | "turns"
-  | "input_tokens"
-  | "output_tokens"
-  | "cache_read_tokens"
-  | "estimated_cost_usd"
+const columns: { key: SortKey; label: string; numeric?: boolean }[] = [
+  { key: "task", label: "Task" },
+  { key: "date", label: "Date" },
+  { key: "model", label: "Model" },
+  { key: "turns", label: "Turns", numeric: true },
+  { key: "input_tokens", label: "Input tokens", numeric: true },
+  { key: "output_tokens", label: "Output tokens", numeric: true },
+  { key: "cache_read_tokens", label: "Cache read", numeric: true },
+  { key: "estimated_cost_usd", label: "Cost", numeric: true },
+]
 
 function formatTokens(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M"
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K"
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
 }
 
 function formatCost(n: number): string {
-  return "$" + n.toFixed(2)
+  return `$${n.toFixed(2)}`
 }
 
 function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 function costColor(cost: number): string {
-  if (cost > 15) return "var(--cost-red)"
-  if (cost > 8) return "var(--cost-yellow)"
-  return "var(--cost-green)"
+  if (cost > 15) return "var(--color-cost-red)"
+  if (cost >= 8) return "var(--color-cost-yellow)"
+  return "var(--color-cost-green)"
 }
 
 export default function Home() {
   const [sessions, setSessions] = useState<TokenRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>("date")
-  const [sortAsc, setSortAsc] = useState(false)
+  const [sortDir, setSortDir] = useState<SortDir>("desc")
 
   useEffect(() => {
     fetch("/api/tokens")
-      .then((r) => r.json())
-      .then((data: { sessions: TokenRecord[] }) => {
-        setSessions(data.sessions)
-        setLoading(false)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
       })
-      .catch(() => setLoading(false))
+      .then((data: { sessions: TokenRecord[] }) => setSessions(data.sessions))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
   }, [])
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(key)
+      setSortDir("asc")
+    }
+  }
 
   const sorted = [...sessions].sort((a, b) => {
     const av = a[sortKey]
     const bv = b[sortKey]
-    if (typeof av === "string" && typeof bv === "string") {
-      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av)
-    }
-    return sortAsc ? Number(av) - Number(bv) : Number(bv) - Number(av)
+    const cmp =
+      typeof av === "string" && typeof bv === "string"
+        ? av.localeCompare(bv)
+        : Number(av) - Number(bv)
+    return sortDir === "asc" ? cmp : -cmp
   })
-
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortAsc(!sortAsc)
-    } else {
-      setSortKey(key)
-      setSortAsc(key === "task" || key === "date" || key === "model")
-    }
-  }
-
-  function sortIndicator(key: SortKey) {
-    if (sortKey !== key) return ""
-    return sortAsc ? " ↑" : " ↓"
-  }
 
   const totalSessions = sessions.length
   const totalCost = sessions.reduce((s, r) => s + r.estimated_cost_usd, 0)
-  const totalTokens = sessions.reduce((s, r) => s + r.input_tokens + r.output_tokens, 0)
+  const totalTokens = sessions.reduce(
+    (s, r) => s + r.input_tokens + r.output_tokens,
+    0,
+  )
   const avgCost = totalSessions > 0 ? totalCost / totalSessions : 0
-
   const totalInput = sessions.reduce((s, r) => s + r.input_tokens, 0)
   const totalOutput = sessions.reduce((s, r) => s + r.output_tokens, 0)
   const totalCacheRead = sessions.reduce((s, r) => s + r.cache_read_tokens, 0)
@@ -96,79 +93,124 @@ export default function Home() {
 
   if (loading) {
     return (
-      <main className="dashboard">
-        <div className="header">
-          <h1>Agent Harness</h1>
-          <span className="badge">Loading...</span>
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-ink">Agent Harness</h1>
+          <span className="rounded-full bg-accent/10 px-3 py-0.5 text-xs font-medium text-accent">
+            Loading…
+          </span>
         </div>
+      </main>
+    )
+  }
+
+  if (error) {
+    return (
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-ink">Agent Harness</h1>
+        </div>
+        <p className="mt-8 text-center text-cost-red">
+          Failed to load sessions: {error}
+        </p>
       </main>
     )
   }
 
   if (sessions.length === 0) {
     return (
-      <main className="dashboard">
-        <div className="header">
-          <h1>Agent Harness</h1>
-          <span className="badge">Idle</span>
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-ink">Agent Harness</h1>
+          <span className="rounded-full bg-accent/10 px-3 py-0.5 text-xs font-medium text-accent">
+            Idle
+          </span>
         </div>
-        <div className="empty-state">No sessions recorded yet</div>
+        <p className="mt-16 text-center text-muted">
+          No sessions recorded yet
+        </p>
       </main>
     )
   }
 
   return (
-    <main className="dashboard">
-      <div className="header">
-        <h1>Agent Harness</h1>
-        <span className="badge">{totalSessions} sessions</span>
+    <main className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mb-8 flex items-center gap-3">
+        <h1 className="text-2xl font-semibold text-ink">Agent Harness</h1>
+        <span className="rounded-full bg-accent/10 px-3 py-0.5 text-xs font-medium text-accent">
+          {totalSessions} sessions
+        </span>
       </div>
 
-      <div className="metrics-grid">
-        <div className="metric-card">
-          <div className="metric-label">Total Sessions</div>
-          <div className="metric-value">{totalSessions}</div>
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl bg-card p-6 shadow-sm">
+          <p className="text-sm text-muted">Total Sessions</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            {totalSessions}
+          </p>
         </div>
-        <div className="metric-card">
-          <div className="metric-label">Total Cost</div>
-          <div className="metric-value">{formatCost(totalCost)}</div>
+        <div className="rounded-2xl bg-card p-6 shadow-sm">
+          <p className="text-sm text-muted">Total Cost</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            {formatCost(totalCost)}
+          </p>
         </div>
-        <div className="metric-card">
-          <div className="metric-label">Total Tokens</div>
-          <div className="metric-value">{formatTokens(totalTokens)}</div>
+        <div className="rounded-2xl bg-card p-6 shadow-sm">
+          <p className="text-sm text-muted">Total Tokens</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            {formatTokens(totalTokens)}
+          </p>
         </div>
-        <div className="metric-card">
-          <div className="metric-label">Avg Cost/Session</div>
-          <div className="metric-value">{formatCost(avgCost)}</div>
+        <div className="rounded-2xl bg-card p-6 shadow-sm">
+          <p className="text-sm text-muted">Avg Cost/Session</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            {formatCost(avgCost)}
+          </p>
         </div>
       </div>
 
-      <div className="table-container">
-        <table>
-          <thead>
+      <div className="overflow-x-auto rounded-2xl bg-card shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-card">
             <tr>
-              <th onClick={() => toggleSort("task")}>Task{sortIndicator("task")}</th>
-              <th onClick={() => toggleSort("date")}>Date{sortIndicator("date")}</th>
-              <th onClick={() => toggleSort("model")}>Model{sortIndicator("model")}</th>
-              <th onClick={() => toggleSort("turns")}>Turns{sortIndicator("turns")}</th>
-              <th onClick={() => toggleSort("input_tokens")}>Input Tokens{sortIndicator("input_tokens")}</th>
-              <th onClick={() => toggleSort("output_tokens")}>Output Tokens{sortIndicator("output_tokens")}</th>
-              <th onClick={() => toggleSort("cache_read_tokens")}>Cache Read{sortIndicator("cache_read_tokens")}</th>
-              <th onClick={() => toggleSort("estimated_cost_usd")}>Cost{sortIndicator("estimated_cost_usd")}</th>
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  onClick={() => toggleSort(col.key)}
+                  className={`cursor-pointer select-none whitespace-nowrap border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted hover:text-ink ${col.numeric ? "text-right" : ""}`}
+                >
+                  {col.label}
+                  {sortKey === col.key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {sorted.map((s, i) => (
-              <tr key={i}>
-                <td className="cell-task">{s.task}</td>
-                <td>{formatDate(s.date)}</td>
-                <td className="cell-model">{s.model}</td>
-                <td className="cell-number">{s.turns}</td>
-                <td className="cell-number">{formatTokens(s.input_tokens)}</td>
-                <td className="cell-number">{formatTokens(s.output_tokens)}</td>
-                <td className="cell-number">{formatTokens(s.cache_read_tokens)}</td>
-                <td>
-                  <span className="cost-bar" style={{ color: costColor(s.estimated_cost_usd) }}>
+              <tr
+                key={i}
+                className={`border-b border-border hover:bg-accent/5 ${i % 2 === 1 ? "bg-row-alt" : ""}`}
+              >
+                <td className="px-4 py-2.5 font-medium">{s.task}</td>
+                <td className="px-4 py-2.5">{formatDate(s.date)}</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{s.model}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">
+                  {s.turns}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums">
+                  {formatTokens(s.input_tokens)}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums">
+                  {formatTokens(s.output_tokens)}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums">
+                  {formatTokens(s.cache_read_tokens)}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums">
+                  <span
+                    className="font-semibold"
+                    style={{ color: costColor(s.estimated_cost_usd) }}
+                  >
                     {formatCost(s.estimated_cost_usd)}
                   </span>
                 </td>
@@ -176,16 +218,24 @@ export default function Home() {
             ))}
           </tbody>
           <tfoot>
-            <tr>
-              <td className="cell-task">Total</td>
-              <td></td>
-              <td></td>
-              <td className="cell-number">{totalTurns}</td>
-              <td className="cell-number">{formatTokens(totalInput)}</td>
-              <td className="cell-number">{formatTokens(totalOutput)}</td>
-              <td className="cell-number">{formatTokens(totalCacheRead)}</td>
-              <td>
-                <span className="cost-bar" style={{ color: costColor(totalCost) }}>
+            <tr className="border-t-2 border-border font-semibold">
+              <td className="px-4 py-3">Total</td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3 text-right tabular-nums">
+                {totalTurns}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums">
+                {formatTokens(totalInput)}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums">
+                {formatTokens(totalOutput)}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums">
+                {formatTokens(totalCacheRead)}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums">
+                <span style={{ color: costColor(totalCost) }}>
                   {formatCost(totalCost)}
                 </span>
               </td>
