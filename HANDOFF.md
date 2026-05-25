@@ -1,43 +1,43 @@
 # Handoff
 
 ## Current State
-Architecture design xong. Chưa viết code. Sẵn sàng implement Phase 0.
+Điều tra xong root cause issue bị "stuck", đã tạo ticket trên Linear, chưa implement.
 
 ## Done
-- [x] Phân tích kiến trúc Creao (Peter Pang) — Grader, Engineering Pipeline, Bridge
-- [x] Phân tích Symphony (OpenAI) — orchestrator spec, dispatch, workspace, retry
-- [x] So sánh CLI vs API agent runtime → chọn CLI (flat cost, tool layer miễn phí)
-- [x] So sánh Rust vs TypeScript → chọn TypeScript (ship nhanh, ecosystem giàu)
-- [x] Quyết định không cần Grader v1 — CI + Sentry + human review đủ
-- [x] Quyết định không cần Bridge v1 — GitHub Actions auto-merge đủ
-- [x] Thiết kế bootstrapping strategy — Phase 0 tự build phần còn lại
-- [x] Viết CLAUDE.md
+- [x] Điều tra tại sao ENG-5, ENG-7 không hoàn thành
+- [x] Research cách Symphony (OpenAI) xử lý stuck agents
+- [x] Retrigger CI cho PR #14 (ENG-5) và PR #16 (ENG-7) bằng empty commit
+- [x] Tạo ENG-10 trên Linear: PR reconciliation loop
+- [x] Tạo ENG-11 trên Linear: fix stall detection
 
 ## Tried & Failed
-- Rust ban đầu — chuyển TypeScript vì mục tiêu ship nhanh, không có performance bottleneck cần Rust
+- **Wall-clock timeout (kill sau 30 phút)** — sai hướng. Agent không treo, nó exit bình thường sau khi tạo PR. Vấn đề là không ai theo dõi PR outcome.
+- **`--max-budget-usd` cap** — cũng sai hướng vì cùng lý do. Claude CLI không có `--max-turns`.
 
 ## Decisions
-- **TypeScript** thay Rust — mục tiêu ship nhanh cho internal team
-- **Claude Code CLI** thay API — flat cost, swap sau qua `interface AgentRunner`
-- **Lockfile state** thay DB — stateless mỗi tick, tự recover
-- **GitHub Actions** lo merge/deploy — không build trong Orchestrator
-- **Sentry poll** thay webhook — cùng pattern poll-based
-- **Phase 0 bootstrapping** — hệ thống tự build chính nó qua Linear tickets
-- **Không Grader v1** — CI + Sentry + human review là quality gate
-- **Không Bridge v1** — GitHub branch protection + auto-merge
+
+### Agent không stuck — thiếu feedback loop
+Agent chạy 1 shot: tạo PR → exit clean. Sau đó không có automation nào sync PR outcome về Linear. PR bị reject → Linear vẫn In Progress mãi → trông như "stuck".
+
+### Reconciliation loop (ENG-10) — giải pháp chính
+Mỗi orchestrator tick cần thêm reconciliation step: scan In Progress issues không có running agent → check GitHub PR status → tự chuyển Linear status:
+- PR merged → Done
+- PR closed/rejected → Rework
+- PR open + CI fail → Rework
+- PR open + CI pending → skip
+
+Symphony (OpenAI) dùng pattern tương tự, gọi là reconciliation loop.
+
+### Stall detection có bug thật nhưng không phải root cause (ENG-11)
+`STALL_TIMEOUT_MS` = `POLL_INTERVAL_MS` = 5 phút → race condition. `process.kill(pid)` chỉ kill shell, không kill child claude process. Priority thấp hơn ENG-10.
 
 ## Next Steps
-- [ ] Init TypeScript project (package.json, tsconfig, pnpm)
-- [ ] Implement Phase 0: `src/index.ts` (~150 lines) — poll Linear → check lockfile → tạo worktree → spawn `claude -p`
-- [ ] Tạo Linear project cho agent-harness
-- [ ] Test: 1 issue Todo → agent pick up → PR
-- [ ] Tạo backlog trên Linear cho Phase 1-9 (retry, stall, Sentry, hooks, ordering...)
-- [ ] Dùng agent-harness build phần còn lại
+- [ ] Merge PR #14 (ENG-5) và PR #16 (ENG-7) sau khi CI pass
+- [ ] Chuyển ENG-10, ENG-11 sang Todo trên Linear để orchestrator tự pick up
+- [ ] Sau khi ENG-10 merge: chạy orchestrator, verify reconciliation loop chuyển đúng status
 
 ## Key Files
-- `CLAUDE.md` — project contract cho agent sessions
-- `CONCEPT.md` — architecture overview
-- `src/index.ts` — (sẽ tạo) Phase 0 entry point
-- `~/Documents/creao-architecture.html` — diagram Creao
-- `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/deep-learning/ai-agent/symphony-setup.md` — Symphony setup reference
-- `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/deep-learning/ai-agent/official/codex-symphony.md` — Symphony spec gốc
+- `src/orchestrator.ts` — tick loop, nơi sẽ gọi reconcile()
+- `src/lockfile.ts` — detectStalls() có bug stall timeout race condition
+- `src/runner.ts` — spawn agent, không cần sửa
+- `GOTCHAS.md` — pitfalls đã biết

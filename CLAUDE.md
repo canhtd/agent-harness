@@ -42,6 +42,7 @@ Agent orchestrator — polls Linear for Todo issues, spawns Claude Code CLI sess
 ## Gotchas
 
 Read [GOTCHAS.md](GOTCHAS.md) before starting any task — contains known pitfalls from prior work.
+Read [PLANS.md](PLANS.md) for project phases and progress.
 
 ## Safety Rails
 
