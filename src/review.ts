@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'node:child_process'
+import { execFileSync, execSync, spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import os from 'node:os'
@@ -91,7 +91,7 @@ export async function reviewPr(prNumber: number): Promise<{ approved: boolean; r
     const env = BOT_TOKEN
       ? { ...process.env, GH_TOKEN: BOT_TOKEN }
       : { ...process.env }
-    execSync(`gh pr review ${prNumber} ${action} -F "${tmpFile}"`, {
+    execFileSync('gh', ['pr', 'review', String(prNumber), action, '-F', tmpFile], {
       cwd: config.repoPath,
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 30_000,

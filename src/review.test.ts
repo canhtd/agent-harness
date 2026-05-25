@@ -4,9 +4,11 @@ import { EventEmitter } from 'node:events'
 const mockWriteFileSync = vi.fn()
 const mockUnlinkSync = vi.fn()
 const mockExecSync = vi.fn()
+const mockExecFileSync = vi.fn()
 
 vi.mock('node:child_process', () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
+  execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
   spawn: vi.fn(() => {
     const child = new EventEmitter() as EventEmitter & {
       stdin: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> }
@@ -48,19 +50,21 @@ beforeEach(() => {
     }
     return Buffer.from('')
   })
+  mockExecFileSync.mockReturnValue(Buffer.from(''))
 })
 
-describe('reviewPr posts body via temp file', () => {
-  it('uses -F flag with temp file instead of -b', async () => {
+describe('reviewPr posts body via temp file using execFileSync', () => {
+  it('calls execFileSync with -F and temp file path as array args', async () => {
     await reviewPr(42)
 
-    const reviewCalls = mockExecSync.mock.calls.filter(
-      (args) => (args[0] as string).includes('gh pr review'),
-    )
-    expect(reviewCalls.length).toBe(1)
-    const reviewCmd = reviewCalls[0][0] as string
-    expect(reviewCmd).toContain('-F "')
-    expect(reviewCmd).not.toContain('-b ')
+    expect(mockExecFileSync).toHaveBeenCalledOnce()
+    const [cmd, args] = mockExecFileSync.mock.calls[0]
+    expect(cmd).toBe('gh')
+    expect(args).toContain('-F')
+    expect(args).toContain('42')
+    expect(args).not.toContain('-b')
+    const fIndex = (args as string[]).indexOf('-F')
+    expect((args as string[])[fIndex + 1]).toMatch(/review-42\.md$/)
   })
 
   it('writes review body to temp file preserving backticks', async () => {
@@ -75,7 +79,6 @@ describe('reviewPr posts body via temp file', () => {
 
   it('preserves backticks and template literals in body content', async () => {
     const testBody = '`execSync` and ${variable} and "quotes"'
-    mockWriteFileSync.mockImplementation(() => {})
 
     const { spawn } = await import('node:child_process')
     vi.mocked(spawn).mockImplementation(() => {
@@ -110,14 +113,8 @@ describe('reviewPr posts body via temp file', () => {
   })
 
   it('cleans up temp file even when posting fails', async () => {
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (cmd.includes('gh pr diff')) {
-        return Buffer.from('diff --git a/file.ts\n+added line')
-      }
-      if (cmd.includes('gh pr review')) {
-        throw new Error('gh failed')
-      }
-      return Buffer.from('')
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error('gh failed')
     })
 
     await reviewPr(88)
@@ -138,5 +135,6 @@ describe('reviewPr posts body via temp file', () => {
     expect(result.approved).toBe(true)
     expect(result.results).toHaveLength(0)
     expect(mockWriteFileSync).not.toHaveBeenCalled()
+    expect(mockExecFileSync).not.toHaveBeenCalled()
   })
 })
