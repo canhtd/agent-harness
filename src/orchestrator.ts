@@ -8,6 +8,7 @@ import { checkPrStatus } from './github.js'
 import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
+import { findSessionJsonl, aggregateTokens, appendTokenRecord } from './tokens.js'
 
 export async function tick(): Promise<void> {
   log.info('tick start')
@@ -32,12 +33,24 @@ export async function tick(): Promise<void> {
   const completed = await cleanup()
 
   for (const agent of completed) {
+    const ws = workspacePath(agent.identifier)
+
     if (hooks.after_run) {
-      const ws = workspacePath(agent.identifier)
       runHook('after_run', hooks.after_run, ws, hooks.timeout, {
         issueId: agent.issueId,
         issueIdentifier: agent.identifier,
       })
+    }
+
+    try {
+      const jsonlPath = findSessionJsonl(ws)
+      if (jsonlPath) {
+        const record = aggregateTokens(jsonlPath, agent.identifier)
+        await appendTokenRecord(record)
+        log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier, cost: record.estimated_cost_usd }, 'token usage recorded')
+      }
+    } catch (err) {
+      log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'token aggregation failed')
     }
   }
 
