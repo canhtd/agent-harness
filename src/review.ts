@@ -4,6 +4,7 @@ import path from 'node:path'
 import { config, log } from './config.js'
 
 const SKILL_DIR = path.join(config.repoPath, '.claude', 'skills')
+const BOT_TOKEN = process.env.GITHUB_BOT_TOKEN || ''
 
 const REVIEWERS = [
   { name: 'quality', skill: 'review-quality' },
@@ -81,12 +82,16 @@ export async function reviewPr(prNumber: number): Promise<{ approved: boolean; r
   const action = approved ? '--approve' : '--request-changes'
 
   try {
+    const env = BOT_TOKEN
+      ? { ...process.env, GH_TOKEN: BOT_TOKEN }
+      : { ...process.env }
     execSync(`gh pr review ${prNumber} ${action} -b "${combinedBody.replace(/"/g, '\\"')}"`, {
       cwd: config.repoPath,
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 30_000,
+      env,
     })
-    log.info({ prNumber, approved }, 'review posted')
+    log.info({ prNumber, approved }, 'review posted via bot')
   } catch (err) {
     log.error({ prNumber, error: String(err) }, 'failed to post review')
   }
