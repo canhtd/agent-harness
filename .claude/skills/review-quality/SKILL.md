@@ -1,3 +1,9 @@
+---
+name: review-quality
+description: "Review PR diff cho code quality: logic, hiệu năng, bảo trì, code style. Chạy tự động bởi orchestrator khi PR open + CI pass."
+when_to_use: "Orchestrator gọi tự động qua review.ts. Không dùng trực tiếp."
+---
+
 # Review: Code Quality
 
 You are reviewing a pull request. Focus ONLY on code quality.
