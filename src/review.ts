@@ -91,7 +91,7 @@ export async function reviewPr(prNumber: number): Promise<{ approved: boolean; r
     const env = BOT_TOKEN
       ? { ...process.env, GH_TOKEN: BOT_TOKEN }
       : { ...process.env }
-    execSync(`gh pr review ${prNumber} ${action} -F ${tmpFile}`, {
+    execSync(`gh pr review ${prNumber} ${action} -F "${tmpFile}"`, {
       cwd: config.repoPath,
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 30_000,

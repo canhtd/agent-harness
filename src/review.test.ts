@@ -59,7 +59,7 @@ describe('reviewPr posts body via temp file', () => {
     )
     expect(reviewCalls.length).toBe(1)
     const reviewCmd = reviewCalls[0][0] as string
-    expect(reviewCmd).toContain('-F ')
+    expect(reviewCmd).toContain('-F "')
     expect(reviewCmd).not.toContain('-b ')
   })
 
