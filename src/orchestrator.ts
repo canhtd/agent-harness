@@ -15,6 +15,16 @@ export async function tick(): Promise<void> {
   for (const dir of [LOCKS, WORKSPACES, LOGS])
     await fs.mkdir(dir, { recursive: true })
 
+  const [activeLocks, worktrees] = await Promise.all([
+    listLocks(),
+    listWorktreeIdentifiers(),
+  ])
+  const heapUsedMb = Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 100) / 100
+  log.info(
+    { activeLocks: activeLocks.length, worktrees: worktrees.length, heapUsedMb },
+    'health check',
+  )
+
   const hooks = await loadHooksConfig(config.repoPath)
 
   await pollSentry()
