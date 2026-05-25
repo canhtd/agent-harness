@@ -1,5 +1,7 @@
 import { execSync, spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
+import fsSync from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { config, log } from './config.js'
 
@@ -83,11 +85,13 @@ export async function reviewPr(prNumber: number): Promise<{ approved: boolean; r
   const combinedBody = results.map((r) => r.body).join('\n\n---\n\n')
   const action = approved ? '--approve' : '--request-changes'
 
+  const tmpFile = path.join(os.tmpdir(), `review-${prNumber}.md`)
   try {
+    fsSync.writeFileSync(tmpFile, combinedBody)
     const env = BOT_TOKEN
       ? { ...process.env, GH_TOKEN: BOT_TOKEN }
       : { ...process.env }
-    execSync(`gh pr review ${prNumber} ${action} -b "${combinedBody.replace(/"/g, '\\"')}"`, {
+    execSync(`gh pr review ${prNumber} ${action} -F ${tmpFile}`, {
       cwd: config.repoPath,
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 30_000,
@@ -96,6 +100,8 @@ export async function reviewPr(prNumber: number): Promise<{ approved: boolean; r
     log.info({ prNumber, approved }, 'review posted via bot')
   } catch (err) {
     log.error({ prNumber, error: String(err) }, 'failed to post review')
+  } finally {
+    try { fsSync.unlinkSync(tmpFile) } catch {}
   }
 
   return { approved, results }
