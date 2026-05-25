@@ -45,3 +45,4 @@ Nếu stall timeout ≥ poll interval, stall detection có thể miss 1 tick —
 ## Linear priority 0 = no priority
 
 Linear priority: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low. Priority 0 không phải cao nhất — nó nghĩa là chưa set. Dispatch ordering xếp 0 và null cuối cùng.
+

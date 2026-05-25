@@ -5,7 +5,8 @@
   "private": true,
   "packageManager": "pnpm@11.3.0",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/index.ts --once",
+    "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },

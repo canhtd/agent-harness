@@ -16,7 +16,7 @@ export async function ensureWorktree(identifier: string): Promise<WorkspaceResul
   const key = sanitize(identifier)
   const ws = path.join(WORKSPACES, key)
   try {
-    await fs.access(ws)
+    await fs.access(path.join(ws, '.git'))
     return { path: ws, created: false }
   } catch {
     try { execSync(`git worktree remove "${ws}" --force`, { cwd: config.repoPath, stdio: 'pipe' }) } catch { /* no worktree */ }
