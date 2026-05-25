@@ -46,3 +46,7 @@ Nếu stall timeout ≥ poll interval, stall detection có thể miss 1 tick —
 
 Linear priority: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low. Priority 0 không phải cao nhất — nó nghĩa là chưa set. Dispatch ordering xếp 0 và null cuối cùng.
 
+## Branch name chứa issue identifier = Linear auto-close nhầm
+
+Linear GitHub integration detect issue identifier (ví dụ `ENG-13`) trong branch name. Nếu PR merge → Linear tự chuyển issue sang Done. Không đặt branch name chứa identifier của issue không liên quan. Branch `agent/ENG-13-test-framework` khiến ENG-13 bị close nhầm khi PR merge.
+

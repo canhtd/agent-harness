@@ -25,24 +25,37 @@ Poll Linear → dispatch Claude Code CLI agents → isolated workspaces → PR l
 - [x] Acceptance criteria verification trong prompt
 - [x] .claude/rules/ cho agent behavior
 
-### Phase 2: Sentry Pipeline ⚠️ Code done, chưa verify
+### Phase 2: Sentry Pipeline ✅
 Sentry error → auto-tạo Linear ticket → Orchestrator dispatch → agent fix.
 
 - [x] `src/sentry.ts` — poll Sentry API, dedup, create Linear ticket (ENG-9)
-- [ ] Config `.env`: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
-- [ ] Test end-to-end: Sentry error → Linear ticket tự tạo → agent fix → PR → merge
-- [ ] Verify dedup: cùng Sentry issue không tạo 2 Linear tickets
+- [x] Config `.env`: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
+- [x] Test: Sentry error → Linear ticket tự tạo (ENG-13)
+- [ ] Triage engine — severity scoring + context điều tra trong ticket
+- [ ] Post-fix verify — poll Sentry sau merge, auto-close ticket nếu error hết
+- [ ] Verify dedup: cùng Sentry issue không tạo 2 Linear tickets (cần lỗi thật)
 
-### Phase 3: Quality Gates + Post-deploy monitoring ⚠️ Partially done
-CI gates trước merge + Sentry monitor sau deploy.
+### Phase 3: Quality Gates ✅
+CI gates trước merge + AI review.
 
-- [x] GitHub Actions CI: typecheck + build
+- [x] GitHub Actions CI: typecheck + build + test (vitest)
 - [x] Security gate: block PR sửa `.env`
-- [x] Auto-merge: CI pass → squash merge
-- [x] Branch protection: require CI pass
-- [ ] Sentry post-deploy watch — error mới sau merge → auto-ticket (cần Phase 2 hoạt động)
-- [ ] Auto-revert khi Sentry spike sau deploy (advanced — defer nếu chưa cần)
-- [ ] AI code review trên PR (Creao dùng 3x Claude review — defer, đắt)
+- [x] Auto-merge: CI pass + review approve → squash merge
+- [x] Branch protection: require CI pass + 1 approval
+- [x] 3x AI code review song song: quality, security, deps (ENG-12)
+- [x] Bot account (`duccanh88`) cho review approval
+- [x] Agent prompt: mandatory test generation (feature + bug fix)
+- [x] Bug fix prompt: reproduce-first approach (label `sentry-auto`/`bug`)
+- [ ] Sentry post-deploy watch — error mới sau merge → auto-ticket (cần lỗi thật)
+- [ ] Auto-revert khi Sentry spike sau deploy (advanced — defer)
+
+### Phase 3.5: Operational Robustness ⚠️
+Hệ thống tự vận hành ổn định.
+
+- [ ] Auto-restart orchestrator sau khi main thay đổi
+- [ ] Merge queue (GitHub merge queue) — rebase + re-run CI trước merge
+- [ ] Process manager (pm2/launchd) — auto-restart nếu crash
+- [x] Full pipeline test: ENG-14 dispatch → code + test → PR → review → merge ✅
 
 ### Phase 4: Grader + Bridge (deferred)
 Khi muốn fully autonomous deploy hoặc quality drift detection.
