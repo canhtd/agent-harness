@@ -12,6 +12,7 @@ export const config = {
   maxReworkConcurrent: 2,
   stallTimeoutMs: Number(process.env.STALL_TIMEOUT_MS) || 180_000,
   maxTurns: Number(process.env.MAX_TURNS) || 5,
+  maxAttempts: Number(process.env.MAX_ATTEMPTS) || 3,
 }
 
 const BASE = path.join(os.homedir(), '.agent-harness')

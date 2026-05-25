@@ -12,7 +12,7 @@ const dest = new Writable({
 const logger = pino({ name: 'test' }, dest)
 
 vi.mock('./config.js', () => ({
-  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5 },
+  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5, maxAttempts: 3 },
   LOCKS: '/tmp/locks',
   WORKSPACES: '/tmp/workspaces',
   LOGS: '/tmp/logs',
@@ -48,6 +48,8 @@ vi.mock('./linear.js', () => ({
   fetchIssueState: vi.fn(),
   fetchIssueStateByIdentifier: vi.fn(),
   transitionToDone: vi.fn(),
+  transitionToBlocked: vi.fn().mockResolvedValue(undefined),
+  postComment: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('./runner.js', () => ({
@@ -57,6 +59,9 @@ vi.mock('./runner.js', () => ({
 
 vi.mock('./github.js', () => ({
   checkPrStatus: vi.fn(),
+  getOpenPrNumber: vi.fn().mockReturnValue(null),
+  closePr: vi.fn(),
+  fetchLastReviewBody: vi.fn().mockReturnValue(''),
 }))
 
 vi.mock('./review.js', () => ({
@@ -91,5 +96,75 @@ describe('tick health check', () => {
     })
     expect(typeof parsed.heapUsedMb).toBe('number')
     expect(parsed.heapUsedMb).toBeGreaterThan(0)
+  })
+})
+
+describe('reconcile: fresh attempt on max turns', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('resets lock for fresh attempt when turns exhausted but attempts remain', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const workspace = await import('./workspace.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-1', identifier: 'ENG-50', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-1', identifier: 'ENG-50',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 5, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.getOpenPrNumber).mockReturnValue(42)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(github.closePr)).toHaveBeenCalledWith(42)
+    expect(vi.mocked(workspace.removeWorktree)).toHaveBeenCalledWith('ENG-50')
+    expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
+      expect.objectContaining({ attempt: 2, turn: 0, pid: -1, exitCode: 0 }),
+    )
+
+    const freshLine = logLines.find((l) => l.includes('fresh attempt 2/3'))
+    expect(freshLine).toBeDefined()
+  })
+
+  it('escalates to human when all attempts exhausted', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-2', identifier: 'ENG-51', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-2', identifier: 'ENG-51',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 3, turn: 5, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.getOpenPrNumber).mockReturnValue(43)
+    vi.mocked(github.fetchLastReviewBody).mockReturnValue('Fix the type errors')
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-2',
+      expect.stringContaining('Agent hit max attempts (3)'),
+    )
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-2',
+      expect.stringContaining('Fix the type errors'),
+    )
+    expect(vi.mocked(linear.transitionToBlocked)).toHaveBeenCalledWith('issue-2')
+    expect(vi.mocked(lockfile.removeLock)).toHaveBeenCalledWith('issue-2')
+
+    const escalateLine = logLines.find((l) => l.includes('escalating to human'))
+    expect(escalateLine).toBeDefined()
   })
 })

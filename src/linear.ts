@@ -108,6 +108,22 @@ export async function transitionToDone(issueId: string): Promise<void> {
   await linear.updateIssue(issueId, { stateId: doneState.id })
 }
 
+export async function transitionToBlocked(issueId: string): Promise<void> {
+  const linear = createClient()
+  const teams = await linear.teams({ filter: { key: { eq: config.teamKey } }, first: 1 })
+  const team = teams.nodes[0]
+  if (!team) return
+  const states = await team.states()
+  const blockedState = states.nodes.find((s) => s.name === 'Blocked')
+  if (!blockedState) return
+  await linear.updateIssue(issueId, { stateId: blockedState.id })
+}
+
+export async function postComment(issueId: string, body: string): Promise<void> {
+  const linear = createClient()
+  await linear.createComment({ issueId, body })
+}
+
 export async function fetchCandidates(): Promise<IssueInfo[]> {
   const linear = createClient()
   const filter: Record<string, unknown> = {

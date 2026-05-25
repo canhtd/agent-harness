@@ -60,10 +60,49 @@ export function checkPrStatus(identifier: string): PrOutcome {
     return { action: 'skip', reason: 'PR approved — awaiting merge' }
   }
   if (reviewState === 'changes_requested') {
-    return { action: 'redispatch', reason: 'review requested changes' }
+    const reviewBody = fetchLastReviewBody(openPr.number)
+    const reason = reviewBody
+      ? `review requested changes:\n\n${reviewBody}`
+      : 'review requested changes'
+    return { action: 'redispatch', reason }
   }
 
   return { action: 'review', prNumber: openPr.number }
+}
+
+export function fetchLastReviewBody(prNumber: number): string {
+  try {
+    return execSync(
+      `gh pr view ${prNumber} --json reviews --jq '.reviews | map(select(.state == "CHANGES_REQUESTED")) | last | .body'`,
+      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
+    ).toString().trim()
+  } catch {
+    return ''
+  }
+}
+
+export function getOpenPrNumber(identifier: string): number | null {
+  const branch = `agent/${sanitize(identifier)}`
+  try {
+    const raw = execSync(
+      `gh pr list --head "${branch}" --state open --json number`,
+      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
+    ).toString().trim()
+    const prs = JSON.parse(raw) as Array<{ number: number }>
+    return prs[0]?.number ?? null
+  } catch {
+    return null
+  }
+}
+
+export function closePr(prNumber: number): void {
+  try {
+    execSync(`gh pr close ${prNumber}`, {
+      cwd: config.repoPath,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 30_000,
+    })
+  } catch {}
 }
 
 function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'none' {
