@@ -73,7 +73,7 @@ export async function fetchInProgressIssues(): Promise<IssueInfo[]> {
   const linear = createClient()
   const filter: Record<string, unknown> = {
     team: { key: { eq: config.teamKey } },
-    state: { name: { eq: 'In Progress' } },
+    state: { name: { in: ['In Progress', 'In Review'] } },
   }
   if (config.projectSlug) {
     filter.project = { slugId: { eq: config.projectSlug } }

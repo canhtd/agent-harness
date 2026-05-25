@@ -33,12 +33,14 @@ function getPrDiff(prNumber: number): string {
 function runClaude(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
-    const child = spawn('claude', ['-p', prompt], {
+    const child = spawn('claude', ['-p', '-'], {
       cwd: config.repoPath,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
     })
     child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
+    child.stdin.write(prompt)
+    child.stdin.end()
     child.on('close', (code) => {
       const output = Buffer.concat(chunks).toString().trim()
       if (code !== 0) reject(new Error(`claude exited ${code}: ${output}`))
