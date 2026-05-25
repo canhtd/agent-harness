@@ -3,9 +3,9 @@ import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { config, LOCKS, LOGS, WORKSPACES, log } from './config.js'
+import { sanitize } from './workspace.js'
 
 const execFileAsync = promisify(execFile)
-import { sanitize } from './workspace.js'
 
 export interface Lock {
   pid: number
@@ -170,6 +170,8 @@ export async function detectStalls(): Promise<void> {
 
     try {
       await execFileAsync('git', ['worktree', 'remove', path.join(WORKSPACES, sanitize(lock.identifier)), '--force'], { cwd: config.repoPath })
-    } catch {}
+    } catch (err) {
+      log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, err }, 'failed to remove worktree after stall kill')
+    }
   }
 }
