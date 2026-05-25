@@ -78,6 +78,7 @@ export function aggregateTokens(jsonlPath: string, issueIdentifier: string): Tok
   let cacheCreationTokens = 0
   let cacheReadTokens = 0
   let turns = 0
+  let cost = 0
   let model = ''
 
   for (const line of lines) {
@@ -93,23 +94,28 @@ export function aggregateTokens(jsonlPath: string, issueIdentifier: string): Tok
     if (!usage) continue
 
     turns++
-    inputTokens += usage.input_tokens ?? 0
-    outputTokens += usage.output_tokens ?? 0
-    cacheCreationTokens += usage.cache_creation_input_tokens ?? 0
-    cacheReadTokens += usage.cache_read_input_tokens ?? 0
+    const ti = usage.input_tokens ?? 0
+    const to = usage.output_tokens ?? 0
+    const tcw = usage.cache_creation_input_tokens ?? 0
+    const tcr = usage.cache_read_input_tokens ?? 0
+
+    inputTokens += ti
+    outputTokens += to
+    cacheCreationTokens += tcw
+    cacheReadTokens += tcr
 
     if (entry.message?.model) {
       model = entry.message.model
     }
-  }
 
-  const family = detectModelFamily(model)
-  const pricing = PRICING[family]!
-  const cost =
-    (inputTokens / 1_000_000) * pricing.input +
-    (outputTokens / 1_000_000) * pricing.output +
-    (cacheCreationTokens / 1_000_000) * pricing.cacheWrite +
-    (cacheReadTokens / 1_000_000) * pricing.cacheRead
+    // Cost per turn using that turn's model pricing
+    const pricing = PRICING[detectModelFamily(model)]!
+    cost +=
+      (ti / 1_000_000) * pricing.input +
+      (to / 1_000_000) * pricing.output +
+      (tcw / 1_000_000) * pricing.cacheWrite +
+      (tcr / 1_000_000) * pricing.cacheRead
+  }
 
   return {
     task: issueIdentifier,
@@ -124,7 +130,8 @@ export function aggregateTokens(jsonlPath: string, issueIdentifier: string): Tok
   }
 }
 
-export async function appendTokenRecord(record: TokenRecord): Promise<void> {
-  await fsp.mkdir(path.dirname(TOKENS_LOG), { recursive: true })
-  await fsp.appendFile(TOKENS_LOG, JSON.stringify(record) + '\n')
+export async function appendTokenRecord(record: TokenRecord, destPath?: string): Promise<void> {
+  const target = destPath ?? TOKENS_LOG
+  await fsp.mkdir(path.dirname(target), { recursive: true })
+  await fsp.appendFile(target, JSON.stringify(record) + '\n')
 }

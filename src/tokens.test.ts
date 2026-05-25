@@ -170,6 +170,31 @@ describe('aggregateTokens', () => {
     expect(record.input_tokens).toBe(0)
     expect(record.estimated_cost_usd).toBe(0)
   })
+
+  it('computes cost per-turn when models differ', () => {
+    const opusTurn = JSON.stringify({
+      type: 'assistant',
+      message: {
+        model: 'claude-opus-4-6-20250514',
+        usage: { input_tokens: 1_000_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+      },
+    })
+    const sonnetTurn = JSON.stringify({
+      type: 'assistant',
+      message: {
+        model: 'claude-sonnet-4-6-20250514',
+        usage: { input_tokens: 1_000_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+      },
+    })
+    fs.writeFileSync(jsonlPath, opusTurn + '\n' + sonnetTurn + '\n')
+
+    const record = aggregateTokens(jsonlPath, 'ENG-15')
+
+    // opus turn: $15, sonnet turn: $3 → total $18
+    expect(record.estimated_cost_usd).toBe(18)
+    expect(record.input_tokens).toBe(2_000_000)
+    expect(record.turns).toBe(2)
+  })
 })
 
 describe('findSessionJsonl', () => {
@@ -185,16 +210,14 @@ describe('appendTokenRecord', () => {
 
   beforeEach(async () => {
     tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'tokens-append-'))
-    tokensFile = path.join(tmpDir, 'tokens.jsonl')
+    tokensFile = path.join(tmpDir, 'nested', 'tokens.jsonl')
   })
 
   afterEach(async () => {
     await fsp.rm(tmpDir, { recursive: true, force: true })
   })
 
-  it('appends records as parseable JSON lines', async () => {
-    const { appendTokenRecord: append } = await import('./tokens.js')
-
+  it('creates directory and appends parseable JSON lines', async () => {
     const record: TokenRecord = {
       task: 'ENG-15',
       date: '2026-05-25T00:00:00.000Z',
@@ -207,9 +230,8 @@ describe('appendTokenRecord', () => {
       estimated_cost_usd: 0.65,
     }
 
-    // Directly write to tmpDir to test format
-    await fsp.appendFile(tokensFile, JSON.stringify(record) + '\n')
-    await fsp.appendFile(tokensFile, JSON.stringify({ ...record, task: 'ENG-16' }) + '\n')
+    await appendTokenRecord(record, tokensFile)
+    await appendTokenRecord({ ...record, task: 'ENG-16' }, tokensFile)
 
     const content = await fsp.readFile(tokensFile, 'utf-8')
     const lines = content.trim().split('\n')
