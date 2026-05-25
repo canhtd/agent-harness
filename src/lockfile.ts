@@ -9,6 +9,7 @@ export interface Lock {
   identifier: string
   startedAt: string
   attempt: number
+  turn?: number
   exitCode?: number
   notBefore?: string
 }
@@ -68,7 +69,8 @@ export async function cleanup(): Promise<void> {
     await removeExitCode(issueId)
 
     if (exitCode === 0) {
-      await removeLock(issueId)
+      lock.exitCode = 0
+      await writeLock(lock)
       log.info({ issueId: lock.issueId, issueIdentifier: lock.identifier }, 'agent exited cleanly')
     } else {
       const code = exitCode ?? 1

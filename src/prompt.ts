@@ -67,3 +67,19 @@ export async function buildPrompt(
     attempt: opts.attempt ?? null,
   })
 }
+
+export function buildContinuationPrompt(issue: IssueInfo, reason: string): string {
+  return [
+    `Linear issue: ${issue.identifier} — ${issue.title}`,
+    '',
+    `Your previous work on this issue needs attention: ${reason}.`,
+    '',
+    'You are running autonomously — do not ask for confirmation.',
+    'Steps:',
+    '1. Understand what changed since your last run',
+    '2. Fix the issue (rebase if conflicts, fix code if CI failed, recreate PR if closed)',
+    '3. Run pnpm typecheck — must pass',
+    '4. git add + commit + push',
+    '5. Verify the PR is updated',
+  ].join('\n')
+}
