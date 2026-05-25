@@ -14,6 +14,8 @@ export async function ensureWorktree(identifier: string): Promise<string> {
     await fs.access(ws)
     execSync('git fetch origin && git rebase origin/main', { cwd: ws, stdio: 'pipe' })
   } catch {
+    try { execSync(`git worktree remove "${ws}" --force`, { cwd: config.repoPath, stdio: 'pipe' }) } catch { /* no worktree */ }
+    try { execSync(`git branch -D "agent/${key}"`, { cwd: config.repoPath, stdio: 'pipe' }) } catch { /* no branch */ }
     execSync(`git worktree add "${ws}" -b "agent/${key}" origin/main`, {
       cwd: config.repoPath,
       stdio: 'pipe',
