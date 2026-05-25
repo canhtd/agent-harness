@@ -9,6 +9,7 @@ export interface Lock {
   identifier: string
   startedAt: string
   attempt: number
+  turn?: number
   exitCode?: number
   notBefore?: string
   stateName?: string

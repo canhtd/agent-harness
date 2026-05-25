@@ -69,6 +69,45 @@ export async function fetchIssueStateByIdentifier(identifier: string): Promise<{
   }
 }
 
+export async function fetchInProgressIssues(): Promise<IssueInfo[]> {
+  const linear = createClient()
+  const filter: Record<string, unknown> = {
+    team: { key: { eq: config.teamKey } },
+    state: { name: { eq: 'In Progress' } },
+  }
+  if (config.projectSlug) {
+    filter.project = { slugId: { eq: config.projectSlug } }
+  }
+  const result = await linear.issues({ filter, first: 50 })
+
+  const issues: IssueInfo[] = []
+  for (const issue of result.nodes) {
+    const labelNodes = await issue.labels()
+    const state = await issue.state
+    issues.push({
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description,
+      priority: issue.priority,
+      labels: labelNodes.nodes.map((l) => l.name),
+      stateName: state?.name ?? 'In Progress',
+    })
+  }
+  return issues
+}
+
+export async function transitionToDone(issueId: string): Promise<void> {
+  const linear = createClient()
+  const teams = await linear.teams({ filter: { key: { eq: config.teamKey } }, first: 1 })
+  const team = teams.nodes[0]
+  if (!team) return
+  const states = await team.states()
+  const doneState = states.nodes.find((s) => s.name === 'Done')
+  if (!doneState) return
+  await linear.updateIssue(issueId, { stateId: doneState.id })
+}
+
 export async function fetchCandidates(): Promise<IssueInfo[]> {
   const linear = createClient()
   const filter: Record<string, unknown> = {

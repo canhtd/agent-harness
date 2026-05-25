@@ -63,6 +63,23 @@ function reworkPrompt(issue: IssueInfo): string {
   ].join('\n')
 }
 
+export function buildContinuationPrompt(issue: IssueInfo, reason: string): string {
+  return [
+    `Linear issue: ${issue.identifier} — ${issue.title} (CONTINUATION)`,
+    '',
+    `Your previous work on this issue needs attention: ${reason}`,
+    '',
+    'You are running autonomously — do not ask for confirmation.',
+    'You have context from the previous turn via --continue.',
+    'Steps:',
+    '1. Understand what changed since your last run',
+    '2. Fix the issue (rebase if conflicts, fix code if CI failed, recreate PR if closed)',
+    '3. Run pnpm typecheck — must pass',
+    '4. git add + commit + push',
+    '5. Verify the PR is updated or create one if needed',
+  ].join('\n')
+}
+
 export async function buildPrompt(
   issue: IssueInfo,
   opts: { attempt?: number; repoPath: string },
