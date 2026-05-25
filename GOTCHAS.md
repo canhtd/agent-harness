@@ -38,6 +38,10 @@ Mọi thay đổi phải qua PR + CI pass. Kể cả CI config fixes.
 
 CI cần `pnpm install --ignore-scripts` vì esbuild postinstall bị block. Local worktree cần `pnpm approve-builds esbuild`.
 
+## STALL_TIMEOUT_MS phải < POLL_INTERVAL_MS
+
+Nếu stall timeout ≥ poll interval, stall detection có thể miss 1 tick — agent stall không bị kill cho đến tick sau. Default: stall timeout = 180s, poll interval = 300s.
+
 ## Linear priority 0 = no priority
 
 Linear priority: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low. Priority 0 không phải cao nhất — nó nghĩa là chưa set. Dispatch ordering xếp 0 và null cuối cùng.

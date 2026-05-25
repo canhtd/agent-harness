@@ -153,8 +153,14 @@ export async function detectStalls(): Promise<void> {
     )
 
     try {
-      process.kill(lock.pid, 'SIGKILL')
-    } catch {}
+      process.kill(-lock.pid, 'SIGKILL')
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code !== 'ESRCH') {
+        try {
+          process.kill(lock.pid, 'SIGKILL')
+        } catch {}
+      }
+    }
     await removeLock(lock.issueId)
   }
 }
