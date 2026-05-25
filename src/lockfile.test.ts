@@ -5,10 +5,10 @@ const mockReaddir = vi.fn()
 const mockReadFile = vi.fn()
 const mockStat = vi.fn()
 const mockUnlink = vi.fn()
-const mockExecSync = vi.fn()
+const mockExecFile = vi.fn((_cmd: string, _args: string[], _opts: object, cb: (err: null, stdout: string, stderr: string) => void) => cb(null, '', ''))
 
 vi.mock('node:child_process', () => ({
-  execSync: (...args: unknown[]) => mockExecSync(...args),
+  execFile: (cmd: string, args: string[], opts: object, cb: (err: null, stdout: string, stderr: string) => void) => mockExecFile(cmd, args, opts, cb),
 }))
 
 vi.mock('node:fs/promises', () => ({
@@ -113,9 +113,11 @@ describe('detectStalls baseline logic', () => {
     vi.spyOn(process, 'kill').mockImplementation(() => true)
 
     await lockfile.detectStalls()
-    expect(mockExecSync).toHaveBeenCalledWith(
-      expect.stringContaining('git worktree remove'),
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      expect.arrayContaining(['worktree', 'remove']),
       expect.objectContaining({ cwd: '/tmp/repo' }),
+      expect.any(Function),
     )
   })
 })

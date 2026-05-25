@@ -1,7 +1,10 @@
-import { execSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { config, LOCKS, LOGS, WORKSPACES, log } from './config.js'
+
+const execFileAsync = promisify(execFile)
 import { sanitize } from './workspace.js'
 
 export interface Lock {
@@ -166,7 +169,7 @@ export async function detectStalls(): Promise<void> {
     await removeLock(lock.issueId)
 
     try {
-      execSync(`git worktree remove "${path.join(WORKSPACES, sanitize(lock.identifier))}" --force`, { cwd: config.repoPath, stdio: 'pipe' })
+      await execFileAsync('git', ['worktree', 'remove', path.join(WORKSPACES, sanitize(lock.identifier)), '--force'], { cwd: config.repoPath })
     } catch {}
   }
 }
