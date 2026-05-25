@@ -1,3 +1,9 @@
+---
+name: review-security
+description: "Review PR diff cho security: injection, auth, secrets, input validation. Chạy tự động bởi orchestrator khi PR open + CI pass."
+when_to_use: "Orchestrator gọi tự động qua review.ts. Không dùng trực tiếp."
+---
+
 # Review: Security
 
 You are reviewing a pull request. Focus ONLY on security.

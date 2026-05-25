@@ -1,3 +1,9 @@
+---
+name: review-deps
+description: "Review PR diff cho dependency changes: supply chain, license, version conflicts. Chạy tự động bởi orchestrator khi PR open + CI pass."
+when_to_use: "Orchestrator gọi tự động qua review.ts. Không dùng trực tiếp. Nếu PR không sửa package.json/lock file/imports thì auto-APPROVE."
+---
+
 # Review: Dependencies
 
 You are reviewing a pull request. Focus ONLY on dependency changes.
