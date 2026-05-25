@@ -2,9 +2,10 @@ import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
 import { fetchCandidates, fetchIssueState, fetchIssueStateByIdentifier } from './linear.js'
-import { ensureWorktree, removeWorktree, listWorktreeIdentifiers } from './workspace.js'
+import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
 import { spawnAgent } from './runner.js'
 import { pollSentry } from './sentry.js'
+import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
 
 export async function tick(): Promise<void> {
   log.info('tick start')
@@ -12,10 +13,23 @@ export async function tick(): Promise<void> {
   for (const dir of [LOCKS, WORKSPACES, LOGS])
     await fs.mkdir(dir, { recursive: true })
 
+  const hooks = await loadHooksConfig(config.repoPath)
+
   await pollSentry()
   await detectStalls()
-  await cleanup()
-  await reconcileTerminal()
+  const completed = await cleanup()
+
+  for (const agent of completed) {
+    if (hooks.after_run) {
+      const ws = workspacePath(agent.identifier)
+      runHook('after_run', hooks.after_run, ws, hooks.timeout, {
+        issueId: agent.issueId,
+        issueIdentifier: agent.identifier,
+      })
+    }
+  }
+
+  await reconcileTerminal(hooks)
 
   const running = await countRunning()
   const slots = config.maxConcurrent - running
@@ -67,7 +81,16 @@ export async function tick(): Promise<void> {
         { issueId: issue.id, issueIdentifier: issue.identifier, attempt },
         isRework ? 'dispatching rework' : 'dispatching',
       )
-      const ws = await ensureWorktree(issue.identifier)
+
+      const meta = { issueId: issue.id, issueIdentifier: issue.identifier }
+      const { path: ws, created } = await ensureWorktree(issue.identifier)
+
+      if (created && hooks.after_create) {
+        runHook('after_create', hooks.after_create, ws, hooks.timeout, meta)
+      }
+
+      runHook('before_run', hooks.before_run, ws, hooks.timeout, meta)
+
       const pid = await spawnAgent(issue, ws, attempt)
       await writeLock({
         pid,
@@ -90,7 +113,7 @@ export async function tick(): Promise<void> {
   )
 }
 
-async function reconcileTerminal(): Promise<void> {
+async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
   const locks = await listLocks()
   const lockedIdentifiers = new Set(locks.map((l) => l.identifier))
 
@@ -105,6 +128,15 @@ async function reconcileTerminal(): Promise<void> {
         try { process.kill(lock.pid, 'SIGTERM') } catch {}
       }
       await removeLock(lock.issueId)
+
+      const ws = workspacePath(lock.identifier)
+      if (hooks.before_remove) {
+        runHook('before_remove', hooks.before_remove, ws, hooks.timeout, {
+          issueId: lock.issueId,
+          issueIdentifier: lock.identifier,
+        })
+      }
+
       try { removeWorktree(lock.identifier) } catch {}
     } catch (err) {
       log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, error: String(err) }, 'terminal reconcile failed')
@@ -119,6 +151,14 @@ async function reconcileTerminal(): Promise<void> {
       if (!result?.terminal) continue
 
       log.info({ issueId: result.id, issueIdentifier: ws, state: result.stateName }, 'terminal cleanup')
+
+      if (hooks.before_remove) {
+        runHook('before_remove', hooks.before_remove, workspacePath(ws), hooks.timeout, {
+          issueId: result.id,
+          issueIdentifier: ws,
+        })
+      }
+
       try { removeWorktree(ws) } catch {}
     } catch (err) {
       log.warn({ issueIdentifier: ws, error: String(err) }, 'orphan reconcile failed')
