@@ -19,5 +19,6 @@ const BASE = path.join(os.homedir(), '.agent-harness')
 export const LOCKS = path.join(BASE, 'locks')
 export const WORKSPACES = path.join(BASE, 'workspaces')
 export const LOGS = path.join(BASE, 'logs')
+export const TOKENS_LOG = path.join(LOGS, 'tokens.jsonl')
 
 export const log = pino({ name: 'agent-harness' })
