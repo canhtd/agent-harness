@@ -3,7 +3,7 @@ import { log } from './config.js'
 import { config } from './config.js'
 import { tick } from './orchestrator.js'
 
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '300000') // 5 min default
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '30000') // 30s default
 const ONCE = process.argv.includes('--once')
 
 function mainHasChanged(): boolean {
