@@ -14,7 +14,7 @@ export async function spawnAgent(issue: IssueInfo, ws: string, attempt?: number)
   const prompt = await buildPrompt(issue, { attempt, repoPath: config.repoPath })
   const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'w')
   const exitCodeFile = path.join(LOCKS, `${issue.id}.exit`)
-  const child = spawn('sh', ['-c', 'claude -p "$1"; echo $? > "$2"', '_', prompt, exitCodeFile], {
+  const child = spawn('sh', ['-c', 'claude -p "$1" --output-format stream-json; echo $? > "$2"', '_', prompt, exitCodeFile], {
     cwd: ws,
     stdio: ['ignore', fd, fd],
     detached: true,
@@ -28,7 +28,7 @@ export async function spawnContinuation(issue: IssueInfo, ws: string, reason: st
   const prompt = buildContinuationPrompt(issue, reason)
   const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'a')
   const exitCodeFile = path.join(LOCKS, `${issue.id}.exit`)
-  const child = spawn('sh', ['-c', 'claude -p "$1" --continue; echo $? > "$2"', '_', prompt, exitCodeFile], {
+  const child = spawn('sh', ['-c', 'claude -p "$1" --continue --output-format stream-json; echo $? > "$2"', '_', prompt, exitCodeFile], {
     cwd: ws,
     stdio: ['ignore', fd, fd],
     detached: true,
