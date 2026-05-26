@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TokenRecord } from "./api/tokens/route";
 
 type SortKey = keyof TokenRecord;
@@ -41,23 +41,28 @@ export default function Home() {
 
   useEffect(() => {
     fetch("/api/tokens")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(r.statusText);
+        return r.json();
+      })
       .then((data: { sessions: TokenRecord[] }) => {
-        setSessions(data.sessions);
+        setSessions(data.sessions ?? []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
-  const sorted = [...sessions].sort((a, b) => {
-    const av = a[sortKey];
-    const bv = b[sortKey];
-    const cmp =
-      typeof av === "string"
-        ? av.localeCompare(bv as string)
-        : (av as number) - (bv as number);
-    return sortDir === "asc" ? cmp : -cmp;
-  });
+  const sorted = useMemo(() => {
+    return [...sessions].sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      const cmp =
+        typeof av === "string"
+          ? av.localeCompare(bv as string)
+          : (av as number) - (bv as number);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [sessions, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
