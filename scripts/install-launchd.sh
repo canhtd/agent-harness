@@ -5,11 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLIST_SRC="$SCRIPT_DIR/com.agent-harness.orchestrator.plist"
 PLIST_DEST="$HOME/Library/LaunchAgents/com.agent-harness.orchestrator.plist"
+DOMAIN_TARGET="gui/$(id -u)"
+SERVICE_TARGET="$DOMAIN_TARGET/com.agent-harness.orchestrator"
 
 mkdir -p "$HOME/.agent-harness/logs"
 
-# Unload existing agent if loaded
-launchctl unload "$PLIST_DEST" 2>/dev/null || true
+# Remove existing agent if loaded
+launchctl bootout "$SERVICE_TARGET" 2>/dev/null || true
 
 # Substitute placeholders and install
 sed -e "s|__REPO_PATH__|$REPO_PATH|g" -e "s|__HOME__|$HOME|g" "$PLIST_SRC" > "$PLIST_DEST"
@@ -17,7 +19,7 @@ sed -e "s|__REPO_PATH__|$REPO_PATH|g" -e "s|__HOME__|$HOME|g" "$PLIST_SRC" > "$P
 echo "Installed plist to $PLIST_DEST"
 
 # Load the agent
-launchctl load "$PLIST_DEST"
+launchctl bootstrap "$DOMAIN_TARGET" "$PLIST_DEST"
 echo "Loaded com.agent-harness.orchestrator"
 
 # Verify
