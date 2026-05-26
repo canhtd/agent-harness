@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { config } from './config.js'
+import { config, log } from './config.js'
 import { sanitize } from './workspace.js'
 
 export type PrOutcome =
@@ -56,9 +56,17 @@ export function checkPrStatus(identifier: string): PrOutcome {
   }
 
   const reviewState = getReviewState(openPr.number)
-  if (reviewState === 'approved') {
-    return { action: 'skip', reason: 'PR approved — awaiting merge' }
+
+  if (reviewState !== 'none' && hasNewCommitsSinceReview(openPr.number)) {
+    return { action: 'review', prNumber: openPr.number }
   }
+
+  if (reviewState === 'approved') {
+    const merged = mergePr(openPr.number)
+    if (merged) return { action: 'done' }
+    return { action: 'skip', reason: 'merge failed, will retry' }
+  }
+
   if (reviewState === 'changes_requested') {
     const reviewBody = fetchLastReviewBody(openPr.number)
     const reason = reviewBody
@@ -108,14 +116,53 @@ export function closePr(prNumber: number): void {
 function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'none' {
   try {
     const raw = execSync(
-      `gh pr view ${prNumber} --json reviews --jq '.reviews | map(.state) | unique'`,
+      `gh pr view ${prNumber} --json reviewDecision --jq '.reviewDecision'`,
       { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
     ).toString().trim()
-    const states: string[] = JSON.parse(raw || '[]')
-    if (states.includes('CHANGES_REQUESTED')) return 'changes_requested'
-    if (states.includes('APPROVED')) return 'approved'
+    if (raw === 'APPROVED') return 'approved'
+    if (raw === 'CHANGES_REQUESTED') return 'changes_requested'
     return 'none'
   } catch {
     return 'none'
+  }
+}
+
+function hasNewCommitsSinceReview(prNumber: number): boolean {
+  try {
+    const raw = execSync(
+      `gh pr view ${prNumber} --json reviews,commits --jq '{lastReview: (.reviews | sort_by(.submittedAt) | last | .submittedAt), lastCommit: (.commits | last | .committedDate)}'`,
+      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
+    ).toString().trim()
+    const { lastReview, lastCommit } = JSON.parse(raw)
+    if (!lastReview || !lastCommit) return false
+    return new Date(lastCommit) > new Date(lastReview)
+  } catch {
+    return false
+  }
+}
+
+export function mergePr(prNumber: number): boolean {
+  try {
+    execSync(`gh pr checks ${prNumber} --fail-fast`, {
+      cwd: config.repoPath,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 30_000,
+    })
+  } catch {
+    log.warn({ prNumber }, 'CI checks not passing — skipping merge')
+    return false
+  }
+
+  try {
+    execSync(`gh pr merge ${prNumber} --squash`, {
+      cwd: config.repoPath,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 30_000,
+    })
+    log.info({ prNumber }, 'PR merged via squash')
+    return true
+  } catch (err) {
+    log.warn({ prNumber, error: String(err) }, 'merge failed')
+    return false
   }
 }
