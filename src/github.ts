@@ -68,12 +68,6 @@ export function checkPrStatus(identifier: string): PrOutcome {
     return { action: 'skip', reason: 'merge failed, will retry' }
   }
 
-  if (reviewState === 'approved') {
-    const merged = mergePr(openPr.number)
-    if (merged) return { action: 'done' }
-    return { action: 'skip', reason: 'merge failed, will retry' }
-  }
-
   if (reviewState === 'changes_requested') {
     const reviewBody = fetchLastReviewBody(openPr.number)
     const reason = reviewBody
