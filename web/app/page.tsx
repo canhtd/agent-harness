@@ -119,7 +119,7 @@ export default function Home() {
               </thead>
               <tbody>
                 {sorted.map((s, i) => (
-                  <tr key={s.task + s.date} className={i % 2 === 0 ? "bg-white" : "bg-black/[0.02]"}>
+                  <tr key={`${s.task}-${s.date}-${i}`} className={i % 2 === 0 ? "bg-white" : "bg-black/[0.02]"}>
                     <td className="px-4 py-3 font-medium text-ink">{s.task}</td>
                     <td className="px-4 py-3 text-muted">{new Date(s.date).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-muted font-mono text-xs">{s.model}</td>
