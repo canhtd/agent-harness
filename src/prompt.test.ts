@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { IssueInfo } from './linear.js'
+
+vi.mock('./config.js', async () => {
+  const actual = await vi.importActual<typeof import('./config.js')>('./config.js')
+  return { ...actual, HANDOFFS: '/tmp/handoffs' }
+})
+
+vi.mock('./workspace.js', () => ({
+  sanitize: vi.fn((s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_')),
+}))
 
 function makeIssue(overrides: Partial<IssueInfo> = {}): IssueInfo {
   return {
@@ -32,6 +41,42 @@ describe('continuation prompt', () => {
     expect(prompt).toContain('CI checks failed')
     expect(prompt).not.toContain('Read the review feedback below carefully')
     expect(prompt).toContain('Fix the issue')
+  })
+})
+
+describe('handoff injection', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('injects handoff content when attempt > 1 and handoff file exists', async () => {
+    const fsPromises = await import('node:fs/promises')
+    vi.spyOn(fsPromises.default, 'readFile').mockImplementation(async (p: any) => {
+      if (String(p).includes('handoffs')) return '# Handoff — Attempt 1\n\n## Tried & Failed\nType error on line 42'
+      throw new Error('ENOENT')
+    })
+
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 2, repoPath: '/nonexistent' })
+    expect(prompt).toContain('## Previous Attempt Handoff')
+    expect(prompt).toContain('Type error on line 42')
+    expect(prompt).toContain('Do NOT repeat the same mistakes')
+  })
+
+  it('does not inject handoff for attempt 1', async () => {
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 1, repoPath: '/nonexistent' })
+    expect(prompt).not.toContain('## Previous Attempt Handoff')
+  })
+
+  it('does not crash when handoff file does not exist', async () => {
+    const fsPromises = await import('node:fs/promises')
+    vi.spyOn(fsPromises.default, 'readFile').mockRejectedValue(new Error('ENOENT'))
+
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 2, repoPath: '/nonexistent' })
+    expect(prompt).not.toContain('## Previous Attempt Handoff')
+    expect(prompt).toContain('ENG-99')
   })
 })
 

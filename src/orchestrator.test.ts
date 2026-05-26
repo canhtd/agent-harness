@@ -16,11 +16,17 @@ vi.mock('./config.js', () => ({
   LOCKS: '/tmp/locks',
   WORKSPACES: '/tmp/workspaces',
   LOGS: '/tmp/logs',
+  HANDOFFS: '/tmp/handoffs',
   log: logger,
 }))
 
 vi.mock('node:fs/promises', () => ({
-  default: { mkdir: vi.fn().mockResolvedValue(undefined) },
+  default: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn().mockRejectedValue(new Error('ENOENT')),
+    unlink: vi.fn().mockResolvedValue(undefined),
+  },
 }))
 
 vi.mock('./lockfile.js', () => ({
@@ -40,6 +46,7 @@ vi.mock('./workspace.js', () => ({
   ensureWorktree: vi.fn(),
   removeWorktree: vi.fn(),
   workspacePath: vi.fn((id: string) => `/tmp/workspaces/${id}`),
+  sanitize: vi.fn((s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_')),
 }))
 
 vi.mock('./linear.js', () => ({
@@ -140,6 +147,42 @@ describe('reconcile: fresh attempt on max turns', () => {
     expect(freshLine).toBeDefined()
   })
 
+  it('writes handoff file before creating fresh attempt', async () => {
+    const fsModule = await import('node:fs/promises')
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-1', identifier: 'ENG-50', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-1', identifier: 'ENG-50',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 5, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.getOpenPrNumber).mockReturnValue(42)
+    vi.mocked(github.fetchLastReviewBody).mockReturnValue('Fix the type errors')
+    vi.mocked(fsModule.default.readFile).mockRejectedValue(new Error('ENOENT'))
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('# Handoff — Attempt 1'),
+      'utf-8',
+    )
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('Fix the type errors'),
+      'utf-8',
+    )
+
+    const handoffLine = logLines.find((l) => l.includes('handoff written'))
+    expect(handoffLine).toBeDefined()
+  })
+
   it('escalates to human when all attempts exhausted', async () => {
     const lockfile = await import('./lockfile.js')
     const linear = await import('./linear.js')
@@ -172,5 +215,122 @@ describe('reconcile: fresh attempt on max turns', () => {
 
     const escalateLine = logLines.find((l) => l.includes('escalating to human'))
     expect(escalateLine).toBeDefined()
+  })
+})
+
+describe('writeHandoff', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('writes handoff with review feedback and log tail', async () => {
+    const fsModule = await import('node:fs/promises')
+    const github = await import('./github.js')
+
+    vi.mocked(github.fetchLastReviewBody).mockReturnValue('Type error on line 42')
+    vi.mocked(fsModule.default.readFile).mockResolvedValue('line 1\nline 2\nline 3')
+
+    const { writeHandoff } = await import('./orchestrator.js')
+    await writeHandoff('ENG-50', 1, 5, 42)
+
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('# Handoff — Attempt 1'),
+      'utf-8',
+    )
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('PR #42 bị reject sau 5 turns'),
+      'utf-8',
+    )
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('Type error on line 42'),
+      'utf-8',
+    )
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('line 1\nline 2\nline 3'),
+      'utf-8',
+    )
+  })
+
+  it('handles missing log file gracefully', async () => {
+    const fsModule = await import('node:fs/promises')
+    const github = await import('./github.js')
+
+    vi.mocked(github.fetchLastReviewBody).mockReturnValue('some feedback')
+    vi.mocked(fsModule.default.readFile).mockRejectedValue(new Error('ENOENT'))
+
+    const { writeHandoff } = await import('./orchestrator.js')
+    await writeHandoff('ENG-50', 1, 5, 42)
+
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('(no log available)'),
+      'utf-8',
+    )
+  })
+
+  it('handles null prNumber', async () => {
+    const fsModule = await import('node:fs/promises')
+    vi.mocked(fsModule.default.readFile).mockRejectedValue(new Error('ENOENT'))
+
+    const { writeHandoff } = await import('./orchestrator.js')
+    await writeHandoff('ENG-50', 1, 5, null)
+
+    expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-50.md',
+      expect.stringContaining('PR #unknown'),
+      'utf-8',
+    )
+  })
+})
+
+describe('removeHandoff', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('deletes the handoff file', async () => {
+    const fsModule = await import('node:fs/promises')
+
+    const { removeHandoff } = await import('./orchestrator.js')
+    await removeHandoff('ENG-50')
+
+    expect(vi.mocked(fsModule.default.unlink)).toHaveBeenCalledWith('/tmp/handoffs/ENG-50.md')
+  })
+
+  it('does not throw if file does not exist', async () => {
+    const fsModule = await import('node:fs/promises')
+    vi.mocked(fsModule.default.unlink).mockRejectedValue(new Error('ENOENT'))
+
+    const { removeHandoff } = await import('./orchestrator.js')
+    await expect(removeHandoff('ENG-50')).resolves.not.toThrow()
+  })
+})
+
+describe('reconcileTerminal cleans up handoffs', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('removes handoff file when issue transitions to terminal state', async () => {
+    const fsModule = await import('node:fs/promises')
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-1', identifier: 'ENG-50', startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 3 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(linear.fetchIssueState).mockResolvedValue({ terminal: true, stateName: 'Done' })
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(fsModule.default.unlink)).toHaveBeenCalledWith('/tmp/handoffs/ENG-50.md')
   })
 })

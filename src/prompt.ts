@@ -2,6 +2,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Liquid } from 'liquidjs'
 import type { IssueInfo } from './linear.js'
+import { HANDOFFS } from './config.js'
+import { sanitize } from './workspace.js'
 
 interface WorkflowFile {
   config: Record<string, string>
@@ -123,6 +125,25 @@ export function buildContinuationPrompt(issue: IssueInfo, reason: string): strin
   ].join('\n')
 }
 
+async function readHandoff(identifier: string): Promise<string | null> {
+  try {
+    return await fs.readFile(path.join(HANDOFFS, `${sanitize(identifier)}.md`), 'utf-8')
+  } catch {
+    return null
+  }
+}
+
+function appendHandoff(prompt: string, handoff: string): string {
+  return [
+    prompt,
+    '',
+    '## Previous Attempt Handoff',
+    handoff,
+    '',
+    'IMPORTANT: Read the handoff above. Do NOT repeat the same mistakes. Address every review point.',
+  ].join('\n')
+}
+
 export async function buildPrompt(
   issue: IssueInfo,
   opts: { attempt?: number; repoPath: string },
@@ -131,25 +152,32 @@ export async function buildPrompt(
   const fallback = issue.stateName === 'Rework' ? reworkPrompt : defaultPrompt
 
   let raw: string
+  let base: string
   try {
     raw = await fs.readFile(path.join(opts.repoPath, templateFile), 'utf-8')
+    const { body } = parseFrontMatter(raw)
+    const engine = new Liquid()
+    base = await engine.parseAndRender(body, {
+      issue: {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description ?? '',
+        priority: issue.priority ?? null,
+        labels: issue.labels,
+        stateName: issue.stateName,
+      },
+      attempt: opts.attempt ?? null,
+    })
   } catch {
-    return fallback(issue)
+    base = fallback(issue)
   }
 
-  const { body } = parseFrontMatter(raw)
+  const attempt = opts.attempt ?? 1
+  if (attempt > 1) {
+    const handoff = await readHandoff(issue.identifier)
+    if (handoff) return appendHandoff(base, handoff)
+  }
 
-  const engine = new Liquid()
-  return engine.parseAndRender(body, {
-    issue: {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      description: issue.description ?? '',
-      priority: issue.priority ?? null,
-      labels: issue.labels,
-      stateName: issue.stateName,
-    },
-    attempt: opts.attempt ?? null,
-  })
+  return base
 }

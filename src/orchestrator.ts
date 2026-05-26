@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises'
-import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
+import path from 'node:path'
+import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToBlocked, postComment } from './linear.js'
-import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
+import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath, sanitize } from './workspace.js'
 import { spawnAgent, spawnContinuation } from './runner.js'
 import type { IssueInfo } from './linear.js'
 import { checkPrStatus, getOpenPrNumber, closePr, fetchLastReviewBody } from './github.js'
@@ -14,7 +15,7 @@ import { findSessionJsonl, aggregateTokens, appendTokenRecord } from './tokens.j
 export async function tick(): Promise<void> {
   log.info('tick start')
 
-  for (const dir of [LOCKS, WORKSPACES, LOGS])
+  for (const dir of [LOCKS, WORKSPACES, LOGS, HANDOFFS])
     await fs.mkdir(dir, { recursive: true })
 
   const [activeLocks, worktrees] = await Promise.all([
@@ -141,6 +142,43 @@ export async function tick(): Promise<void> {
   )
 }
 
+export async function writeHandoff(identifier: string, attempt: number, turns: number, prNumber: number | null): Promise<void> {
+  const key = sanitize(identifier)
+
+  let reviewBody = ''
+  if (prNumber) reviewBody = fetchLastReviewBody(prNumber)
+
+  let logTail = ''
+  try {
+    const logPath = path.join(LOGS, `${key}.log`)
+    const content = await fs.readFile(logPath, 'utf-8')
+    const lines = content.split('\n')
+    logTail = lines.slice(-50).join('\n')
+  } catch {}
+
+  const handoff = [
+    `# Handoff — Attempt ${attempt}`,
+    '',
+    '## Current State',
+    `PR #${prNumber ?? 'unknown'} bị reject sau ${turns} turns`,
+    '',
+    '## Tried & Failed',
+    reviewBody || '(no review feedback)',
+    '',
+    '## Agent Log (last 50 lines)',
+    logTail || '(no log available)',
+  ].join('\n')
+
+  await fs.writeFile(path.join(HANDOFFS, `${key}.md`), handoff, 'utf-8')
+  log.info({ issueIdentifier: identifier, attempt }, 'handoff written')
+}
+
+export async function removeHandoff(identifier: string): Promise<void> {
+  try {
+    await fs.unlink(path.join(HANDOFFS, `${sanitize(identifier)}.md`))
+  } catch {}
+}
+
 async function reconcile(): Promise<void> {
   const inProgress = await fetchInProgressIssues()
   const running = await countRunning()
@@ -161,6 +199,7 @@ async function reconcile(): Promise<void> {
 
       if (attempt < config.maxAttempts) {
         const prNumber = getOpenPrNumber(issue.identifier)
+        await writeHandoff(issue.identifier, attempt, turn, prNumber)
         if (prNumber) closePr(prNumber)
         try { await removeWorktree(issue.identifier) } catch {}
 
@@ -283,6 +322,7 @@ async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
         try { process.kill(lock.pid, 'SIGTERM') } catch {}
       }
       await removeLock(lock.issueId)
+      await removeHandoff(lock.identifier)
 
       const ws = workspacePath(lock.identifier)
       if (hooks.before_remove) {
@@ -306,6 +346,7 @@ async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
       if (!result?.terminal) continue
 
       log.info({ issueId: result.id, issueIdentifier: ws, state: result.stateName }, 'terminal cleanup')
+      await removeHandoff(ws)
 
       if (hooks.before_remove) {
         runHook('before_remove', hooks.before_remove, workspacePath(ws), hooks.timeout, {
