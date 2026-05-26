@@ -87,9 +87,25 @@ When an agent is killed mid-`git rebase`, the worktree retains a `rebase-merge` 
 2. `--ff-only` fails when local main has unpushed commits (local hotfix commit + PR squash merge creates different hash → diverge → ff-only rejects)
 3. Local main never has local-only commits — agents work in worktrees, all changes go through PRs. `reset --hard` is safe.
 
+## Push thẳng main bị reject → local main diverge → orchestrator chạy code cũ
+
+Khi push thẳng lên main bị branch protection reject, commit vẫn nằm trên local main. Origin/main có squash-merged version từ PR. Local main diverge → `start.sh` chạy `git pull --ff-only` fail silently → orchestrator không pull được code mới. Fix: `git reset --hard origin/main`.
+
 ## Review ENOENT khi claude chưa install xong
 
 `review.ts` dùng `spawn('claude', ...)` để chạy AI review. Nếu `claude` binary chưa install (máy mới, đang upgrade, hoặc agent vừa `npm install -g` giữa chừng), review fail `ENOENT` → post "CHANGES_REQUESTED" với lý do vô nghĩa → agent burn hết turns cố fix lỗi không phải của mình. Đã xảy ra với ENG-41: binary install lúc 08:10, review chạy lúc 08:08 → 4 turns wasted.
+
+## Bot không re-review PR sau khi agent push fix
+
+`checkPrStatus()` chỉ trigger `action: 'review'` khi `getReviewState === 'none'` (zero reviews). Sau CHANGES_REQUESTED, review cũ tồn tại mãi → `getReviewState` luôn trả `'changes_requested'` → agent nhận stale feedback loop 5 turn → fresh attempt → PR mới. ENG-17 mất 14 PR vì pattern này. Fix: so sánh commit date vs review date, nếu có commit mới thì re-review. Tracking: ENG-25.
+
+## getReviewState check ALL reviews thay vì latest
+
+`github.ts:108-121` dùng `.reviews | map(.state) | unique` — gộp tất cả review history. CHANGES_REQUESTED check trước APPROVED (line 115-116). Nên kể cả bot approve lần 2, review cũ vẫn block. Fix: dùng `reviewDecision` field hoặc sort by `submittedAt` lấy latest. Tracking: ENG-25.
+
+## KHÔNG hardcode secrets vào launchd plist hoặc bất kỳ file config nào
+
+macOS launchd sandbox block `source .env` từ user directories. Giải pháp SAI: copy secrets vào `EnvironmentVariables` trong plist — secrets plaintext trên disk, leak trong conversation/log. Giải pháp ĐÚNG: dùng `/bin/zsh -l -c "source .env && exec node ..."` trong ProgramArguments để login shell load env từ `.env` file.
 
 ## Systemd KillMode=control-group kills detached agents
 

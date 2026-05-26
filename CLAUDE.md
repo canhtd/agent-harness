@@ -54,6 +54,8 @@ Read [PLANS.md](PLANS.md) for project phases and progress.
 - Spawn more than 10 concurrent agents
 - Merge PRs without CI pass + human review (v1)
 - Put secrets in code — Linear API key comes from environment
+- Read, print, or inline secrets from .env into any file, config, plist, or tool output
+- Pass secrets as command arguments or embed in shell commands visible in logs
 
 ### ALWAYS
 
@@ -61,6 +63,16 @@ Read [PLANS.md](PLANS.md) for project phases and progress.
 - Run `pnpm typecheck` before marking work complete
 - Include `issueId` in all log entries
 - Clean up worktrees for terminal issues
+
+## Bail & Handoff
+
+Khi thử fix/implement mà cùng approach fail 3 lần:
+1. Dừng ngay — không thử lần 4
+2. Viết HANDOFF.md theo format trong `~/.claude/rules/handoff.md`
+3. Ghi rõ: đã thử gì, fail vì sao, evidence nào đã collect
+4. Nói cho user biết đang dừng và tại sao
+
+"Fail" = cùng lỗi hoặc lỗi mới từ cùng approach. Đổi approach thì reset count.
 
 ## Verification
 
