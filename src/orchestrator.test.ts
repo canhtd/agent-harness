@@ -125,6 +125,7 @@ describe('reconcile: fresh attempt on max turns', () => {
       startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 5, exitCode: 0,
     })
     vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'CI failed' })
     vi.mocked(github.getOpenPrNumber).mockReturnValue(42)
 
     const { tick } = await import('./orchestrator.js')
@@ -153,6 +154,7 @@ describe('reconcile: fresh attempt on max turns', () => {
       startedAt: '2025-01-01T00:00:00Z', attempt: 3, turn: 5, exitCode: 0,
     })
     vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'review rejected' })
     vi.mocked(github.getOpenPrNumber).mockReturnValue(43)
     vi.mocked(github.fetchLastReviewBody).mockReturnValue('Fix the type errors')
 
@@ -172,5 +174,103 @@ describe('reconcile: fresh attempt on max turns', () => {
 
     const escalateLine = logLines.find((l) => l.includes('escalating to human'))
     expect(escalateLine).toBeDefined()
+  })
+})
+
+describe('reconcile: PR status checked before max turns', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('transitions to Done when PR merged at max turn', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-3', identifier: 'ENG-60', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-3', identifier: 'ENG-60',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 5, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'done' })
+    vi.mocked(github.getOpenPrNumber).mockReturnValue(null)
+    vi.mocked(github.closePr).mockReset()
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.transitionToDone)).toHaveBeenCalledWith('issue-3')
+    expect(vi.mocked(lockfile.removeLock)).toHaveBeenCalledWith('issue-3')
+
+    const doneLine = logLines.find((l) => l.includes('PR merged, transitioned to Done'))
+    expect(doneLine).toBeDefined()
+
+    expect(vi.mocked(github.closePr)).not.toHaveBeenCalled()
+  })
+
+  it('triggers review when PR needs review at max turn', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const review = await import('./review.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-4', identifier: 'ENG-61', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-4', identifier: 'ENG-61',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 5, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'review', prNumber: 77 })
+    vi.mocked(github.getOpenPrNumber).mockReturnValue(null)
+    vi.mocked(github.closePr).mockReset()
+    vi.mocked(linear.transitionToBlocked).mockReset()
+    vi.mocked(review.reviewPr).mockResolvedValue({ approved: false, results: [] })
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(review.reviewPr)).toHaveBeenCalledWith(77)
+
+    const reviewLine = logLines.find((l) => l.includes('triggering review'))
+    expect(reviewLine).toBeDefined()
+
+    expect(vi.mocked(github.closePr)).not.toHaveBeenCalled()
+    expect(vi.mocked(linear.transitionToBlocked)).not.toHaveBeenCalled()
+  })
+
+  it('triggers fresh attempt when redispatch at max turn', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const workspace = await import('./workspace.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-5', identifier: 'ENG-62', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-5', identifier: 'ENG-62',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 5, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'merge conflict' })
+    vi.mocked(github.getOpenPrNumber).mockReturnValue(88)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(github.closePr)).toHaveBeenCalledWith(88)
+    expect(vi.mocked(workspace.removeWorktree)).toHaveBeenCalledWith('ENG-62')
+    expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
+      expect.objectContaining({ attempt: 2, turn: 0, pid: -1, exitCode: 0 }),
+    )
+
+    const freshLine = logLines.find((l) => l.includes('fresh attempt 2/3'))
+    expect(freshLine).toBeDefined()
   })
 })
