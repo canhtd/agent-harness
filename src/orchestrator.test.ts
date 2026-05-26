@@ -243,7 +243,7 @@ describe('reconcile: PR status checked before max turns', () => {
     const { tick } = await import('./orchestrator.js')
     await tick()
 
-    expect(vi.mocked(review.reviewPr)).toHaveBeenCalledWith(77)
+    expect(vi.mocked(review.reviewPr)).toHaveBeenCalledWith(77, '')
 
     const reviewLine = logLines.find((l) => l.includes('triggering review'))
     expect(reviewLine).toBeDefined()
