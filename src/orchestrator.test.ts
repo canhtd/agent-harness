@@ -283,6 +283,104 @@ describe('reconcile: PR status checked before max turns', () => {
   })
 })
 
+describe('reconcile: post comment on redispatch', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('posts turn comment before re-dispatching', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const workspace = await import('./workspace.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-c1', identifier: 'ENG-80', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-c1', identifier: 'ENG-80',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'CI failed' })
+    vi.mocked(workspace.ensureWorktree).mockResolvedValue({ path: '/tmp/workspaces/ENG-80', created: false })
+    vi.mocked(runner.spawnContinuation).mockResolvedValue(1234)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-c1',
+      '**Turn 3**: CI failed',
+    )
+    expect(vi.mocked(runner.spawnContinuation)).toHaveBeenCalled()
+  })
+
+  it('dispatches even when comment post fails', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const workspace = await import('./workspace.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-c2', identifier: 'ENG-81', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-c2', identifier: 'ENG-81',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 1, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'tests failed' })
+    vi.mocked(linear.postComment).mockRejectedValueOnce(new Error('Linear API timeout'))
+    vi.mocked(workspace.ensureWorktree).mockResolvedValue({ path: '/tmp/workspaces/ENG-81', created: false })
+    vi.mocked(runner.spawnContinuation).mockResolvedValue(5678)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnContinuation)).toHaveBeenCalled()
+
+    const warnLine = logLines.find((l) => l.includes('failed to post turn comment'))
+    expect(warnLine).toBeDefined()
+  })
+
+  it('does not post comment on skip, done, or review', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const review = await import('./review.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-c3', identifier: 'ENG-82', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+      { id: 'issue-c4', identifier: 'ENG-83', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+      { id: 'issue-c5', identifier: 'ENG-84', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-c3', identifier: 'ENG-82',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    let callCount = 0
+    vi.mocked(github.checkPrStatus).mockImplementation(() => {
+      callCount++
+      if (callCount === 1) return { action: 'done' }
+      if (callCount === 2) return { action: 'review', prNumber: 99 }
+      return { action: 'skip', reason: 'waiting' }
+    })
+    vi.mocked(review.reviewPr).mockResolvedValue({ approved: true, results: [] })
+    vi.mocked(linear.postComment).mockClear()
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.postComment)).not.toHaveBeenCalled()
+  })
+})
+
 describe('reconcileTerminal: handoff cleanup', () => {
   beforeEach(() => {
     logLines.length = 0

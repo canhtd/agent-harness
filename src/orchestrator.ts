@@ -234,6 +234,12 @@ async function reconcile(): Promise<void> {
     )
 
     try {
+      await postComment(issue.id, `**Turn ${nextTurn}**: ${outcome.reason}`)
+    } catch (err) {
+      log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post turn comment')
+    }
+
+    try {
       const { path: ws } = await ensureWorktree(issue.identifier)
       const pid = isFreshAttempt
         ? await spawnAgent(issue, ws, attempt)
