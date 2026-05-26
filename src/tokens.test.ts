@@ -149,6 +149,27 @@ describe('findSessionJsonl', () => {
     const result = findSessionJsonl('/nonexistent/path')
     expect(result).toBeNull()
   })
+
+  it('encodes dots and slashes to dashes, preserving leading dash', () => {
+    const homedir = os.homedir()
+    const encoded = '/Users/danny/.agent-harness/workspaces/ENG-15'
+      .replace(/[\/\.]/g, '-')
+    expect(encoded).toBe('-Users-danny--agent-harness-workspaces-ENG-15')
+
+    const projectDir = path.join(homedir, '.claude', 'projects', encoded)
+    fs.mkdirSync(projectDir, { recursive: true })
+    const jsonlFile = path.join(projectDir, 'session-abc.jsonl')
+    fs.writeFileSync(jsonlFile, buildAssistantLine('claude-opus-4-6', {
+      input_tokens: 100, output_tokens: 50,
+      cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+    }))
+
+    const result = findSessionJsonl('/Users/danny/.agent-harness/workspaces/ENG-15')
+    expect(result).not.toBeNull()
+    expect(result!.endsWith('.jsonl')).toBe(true)
+
+    fs.rmSync(projectDir, { recursive: true })
+  })
 })
 
 describe('appendTokenRecord', () => {

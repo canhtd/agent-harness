@@ -38,7 +38,7 @@ function detectFamily(model: string): string {
 
 export function findSessionJsonl(workspacePath: string): string | null {
   const abs = path.resolve(workspacePath)
-  const encoded = abs.replace(/\//g, '-').replace(/^-/, '')
+  const encoded = abs.replace(/[\/\.]/g, '-')
   const projectDir = path.join(os.homedir(), '.claude', 'projects', encoded)
 
   if (!fs.existsSync(projectDir)) return null
