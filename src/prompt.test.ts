@@ -71,7 +71,8 @@ describe('handoff injection', () => {
 
   it('does not crash when handoff file does not exist', async () => {
     const fsPromises = await import('node:fs/promises')
-    vi.spyOn(fsPromises.default, 'readFile').mockRejectedValue(new Error('ENOENT'))
+    const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    vi.spyOn(fsPromises.default, 'readFile').mockRejectedValue(err)
 
     const { buildPrompt } = await import('./prompt.js')
     const prompt = await buildPrompt(makeIssue(), { attempt: 2, repoPath: '/nonexistent' })

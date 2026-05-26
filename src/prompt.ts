@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Liquid } from 'liquidjs'
 import type { IssueInfo } from './linear.js'
-import { HANDOFFS } from './config.js'
+import { HANDOFFS, log } from './config.js'
 import { sanitize } from './workspace.js'
 
 interface WorkflowFile {
@@ -128,7 +128,10 @@ export function buildContinuationPrompt(issue: IssueInfo, reason: string): strin
 async function readHandoff(identifier: string): Promise<string | null> {
   try {
     return await fs.readFile(path.join(HANDOFFS, `${sanitize(identifier)}.md`), 'utf-8')
-  } catch {
+  } catch (err: unknown) {
+    if (!(err instanceof Error) || !('code' in err) || err.code !== 'ENOENT') {
+      log.warn({ issueIdentifier: identifier, error: String(err) }, 'failed to read handoff')
+    }
     return null
   }
 }

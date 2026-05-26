@@ -146,7 +146,7 @@ export async function writeHandoff(issueId: string, identifier: string, attempt:
   const key = sanitize(identifier)
 
   let reviewBody = ''
-  if (prNumber) reviewBody = fetchLastReviewBody(prNumber)
+  if (prNumber !== null) reviewBody = fetchLastReviewBody(prNumber)
 
   let logTail = ''
   try {
@@ -154,7 +154,11 @@ export async function writeHandoff(issueId: string, identifier: string, attempt:
     const content = await fs.readFile(logPath, 'utf-8')
     const lines = content.split('\n')
     logTail = lines.slice(-50).join('\n')
-  } catch {}
+  } catch (err: unknown) {
+    if (!(err instanceof Error) || !('code' in err) || err.code !== 'ENOENT') {
+      log.warn({ issueId, issueIdentifier: identifier, error: String(err) }, 'failed to read agent log for handoff')
+    }
+  }
 
   const handoff = [
     `# Handoff — Attempt ${attempt}`,
@@ -176,7 +180,11 @@ export async function writeHandoff(issueId: string, identifier: string, attempt:
 export async function removeHandoff(identifier: string): Promise<void> {
   try {
     await fs.unlink(path.join(HANDOFFS, `${sanitize(identifier)}.md`))
-  } catch {}
+  } catch (err: unknown) {
+    if (!(err instanceof Error) || !('code' in err) || err.code !== 'ENOENT') {
+      log.warn({ issueIdentifier: identifier, error: String(err) }, 'failed to remove handoff')
+    }
+  }
 }
 
 async function reconcile(): Promise<void> {
@@ -292,7 +300,7 @@ async function reconcile(): Promise<void> {
 async function escalateToHuman(issue: IssueInfo, lock: Awaited<ReturnType<typeof readLock>>): Promise<void> {
   const prNumber = getOpenPrNumber(issue.identifier)
   let reviewBody = ''
-  if (prNumber) reviewBody = fetchLastReviewBody(prNumber)
+  if (prNumber !== null) reviewBody = fetchLastReviewBody(prNumber)
 
   const comment = `Agent hit max attempts (${config.maxAttempts}). Last review feedback:\n\n${reviewBody || '(no review feedback)'}\n\nNeeds human intervention.`
   await postComment(issue.id, comment)
