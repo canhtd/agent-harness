@@ -9,7 +9,7 @@ if [ ! -f "$PLIST_DEST" ]; then
   exit 0
 fi
 
-launchctl unload "$PLIST_DEST"
+launchctl unload "$PLIST_DEST" 2>/dev/null || true
 echo "Unloaded com.agent-harness.orchestrator"
 
 rm "$PLIST_DEST"
