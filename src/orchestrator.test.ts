@@ -16,11 +16,19 @@ vi.mock('./config.js', () => ({
   LOCKS: '/tmp/locks',
   WORKSPACES: '/tmp/workspaces',
   LOGS: '/tmp/logs',
+  HANDOFFS: '/tmp/handoffs',
+  handoffPath: (id: string) => `/tmp/handoffs/${id}.md`,
   log: logger,
 }))
 
+const mockFs = {
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+  unlink: vi.fn().mockResolvedValue(undefined),
+}
 vi.mock('node:fs/promises', () => ({
-  default: { mkdir: vi.fn().mockResolvedValue(undefined) },
+  default: mockFs,
 }))
 
 vi.mock('./lockfile.js', () => ({
@@ -140,6 +148,46 @@ describe('reconcile: fresh attempt on max turns', () => {
     expect(freshLine).toBeDefined()
   })
 
+  it('writes handoff file before fresh attempt with review feedback and log tail', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-h', identifier: 'ENG-60', title: 'Handoff test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-h', identifier: 'ENG-60',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 5, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.getOpenPrNumber).mockReturnValue(55)
+    vi.mocked(github.fetchLastReviewBody).mockReturnValue('Fix the imports')
+    mockFs.readFile.mockResolvedValueOnce('line1\nline2\nline3')
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(mockFs.writeFile).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-60.md',
+      expect.stringContaining('# Handoff — Attempt 1'),
+      'utf-8',
+    )
+    expect(mockFs.writeFile).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-60.md',
+      expect.stringContaining('Fix the imports'),
+      'utf-8',
+    )
+    expect(mockFs.writeFile).toHaveBeenCalledWith(
+      '/tmp/handoffs/ENG-60.md',
+      expect.stringContaining('line1\nline2\nline3'),
+      'utf-8',
+    )
+
+    const handoffLine = logLines.find((l) => l.includes('handoff written'))
+    expect(handoffLine).toBeDefined()
+  })
+
   it('escalates to human when all attempts exhausted', async () => {
     const lockfile = await import('./lockfile.js')
     const linear = await import('./linear.js')
@@ -172,5 +220,31 @@ describe('reconcile: fresh attempt on max turns', () => {
 
     const escalateLine = logLines.find((l) => l.includes('escalating to human'))
     expect(escalateLine).toBeDefined()
+  })
+})
+
+describe('reconcileTerminal: handoff cleanup', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+    mockFs.unlink.mockReset()
+    mockFs.unlink.mockResolvedValue(undefined)
+  })
+
+  it('removes handoff file when issue transitions to terminal state', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-t', identifier: 'ENG-70', startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 3 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(linear.fetchIssueState).mockResolvedValue({ terminal: true, stateName: 'Done' })
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([])
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(mockFs.unlink).toHaveBeenCalledWith('/tmp/handoffs/ENG-70.md')
   })
 })

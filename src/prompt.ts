@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Liquid } from 'liquidjs'
 import type { IssueInfo } from './linear.js'
+import { handoffPath } from './config.js'
 
 interface WorkflowFile {
   config: Record<string, string>
@@ -123,6 +124,27 @@ export function buildContinuationPrompt(issue: IssueInfo, reason: string): strin
   ].join('\n')
 }
 
+async function readHandoff(identifier: string): Promise<string> {
+  try {
+    return await fs.readFile(handoffPath(identifier), 'utf-8')
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') throw err
+    return ''
+  }
+}
+
+function appendHandoff(prompt: string, handoff: string): string {
+  if (!handoff) return prompt
+  return [
+    prompt,
+    '',
+    '## Previous Attempt Handoff',
+    handoff,
+    '',
+    'IMPORTANT: Read the handoff above. Do NOT repeat the same mistakes. Address every review point.',
+  ].join('\n')
+}
+
 export async function buildPrompt(
   issue: IssueInfo,
   opts: { attempt?: number; repoPath: string },
@@ -130,17 +152,18 @@ export async function buildPrompt(
   const templateFile = issue.stateName === 'Rework' ? 'WORKFLOW_REWORK.md' : 'WORKFLOW.md'
   const fallback = issue.stateName === 'Rework' ? reworkPrompt : defaultPrompt
 
+  let prompt: string
   let raw: string
   try {
     raw = await fs.readFile(path.join(opts.repoPath, templateFile), 'utf-8')
   } catch {
-    return fallback(issue)
+    prompt = fallback(issue)
+    return maybeAppendHandoff(prompt, issue.identifier, opts.attempt)
   }
 
   const { body } = parseFrontMatter(raw)
-
   const engine = new Liquid()
-  return engine.parseAndRender(body, {
+  prompt = await engine.parseAndRender(body, {
     issue: {
       id: issue.id,
       identifier: issue.identifier,
@@ -152,4 +175,12 @@ export async function buildPrompt(
     },
     attempt: opts.attempt ?? null,
   })
+
+  return maybeAppendHandoff(prompt, issue.identifier, opts.attempt)
+}
+
+async function maybeAppendHandoff(prompt: string, identifier: string, attempt?: number): Promise<string> {
+  if ((attempt ?? 1) <= 1) return prompt
+  const handoff = await readHandoff(identifier)
+  return appendHandoff(prompt, handoff)
 }

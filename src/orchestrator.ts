@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
-import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
+import path from 'node:path'
+import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, handoffPath, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToBlocked, postComment } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
@@ -14,7 +15,7 @@ import { findSessionJsonl, aggregateTokens, appendTokenRecord } from './tokens.j
 export async function tick(): Promise<void> {
   log.info('tick start')
 
-  for (const dir of [LOCKS, WORKSPACES, LOGS])
+  for (const dir of [LOCKS, WORKSPACES, LOGS, HANDOFFS])
     await fs.mkdir(dir, { recursive: true })
 
   const [activeLocks, worktrees] = await Promise.all([
@@ -161,7 +162,10 @@ async function reconcile(): Promise<void> {
 
       if (attempt < config.maxAttempts) {
         const prNumber = getOpenPrNumber(issue.identifier)
-        if (prNumber) closePr(prNumber)
+
+        await writeHandoff(issue.id, issue.identifier, attempt, turn, prNumber)
+
+        if (prNumber !== null) closePr(prNumber)
         try { await removeWorktree(issue.identifier) } catch {}
 
         const nextAttempt = attempt + 1
@@ -268,6 +272,45 @@ async function escalateToHuman(issue: IssueInfo, lock: Awaited<ReturnType<typeof
   )
 }
 
+async function writeHandoff(issueId: string, identifier: string, attempt: number, turns: number, prNumber: number | null): Promise<void> {
+  let reviewBody = ''
+  if (prNumber !== null) reviewBody = fetchLastReviewBody(prNumber)
+
+  let logTail = ''
+  try {
+    const logFile = path.join(LOGS, `${identifier}.log`)
+    const content = await fs.readFile(logFile, 'utf-8')
+    const lines = content.split('\n')
+    logTail = lines.slice(-50).join('\n')
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') log.warn({ issueId, issueIdentifier: identifier, error: String(err) }, 'failed to read agent log for handoff')
+  }
+
+  const sections = [
+    `# Handoff — Attempt ${attempt}`,
+    '',
+    '## Current State',
+    `PR #${prNumber ?? 'none'} bị reject sau ${turns} turns`,
+    '',
+    '## Tried & Failed',
+    reviewBody || '(no review feedback)',
+    '',
+    '## Agent Log (last 50 lines)',
+    logTail || '(no log available)',
+  ]
+
+  await fs.writeFile(handoffPath(identifier), sections.join('\n'), 'utf-8')
+  log.info({ issueId, issueIdentifier: identifier, attempt }, 'handoff written')
+}
+
+async function removeHandoff(identifier: string): Promise<void> {
+  try {
+    await fs.unlink(handoffPath(identifier))
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') log.warn({ issueIdentifier: identifier, error: String(err) }, 'failed to remove handoff')
+  }
+}
+
 async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
   const locks = await listLocks()
   const lockedIdentifiers = new Set(locks.map((l) => l.identifier))
@@ -293,6 +336,7 @@ async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
       }
 
       try { removeWorktree(lock.identifier) } catch {}
+      await removeHandoff(lock.identifier)
     } catch (err) {
       log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, error: String(err) }, 'terminal reconcile failed')
     }
@@ -315,6 +359,7 @@ async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
       }
 
       try { removeWorktree(ws) } catch {}
+      await removeHandoff(ws)
     } catch (err) {
       log.warn({ issueIdentifier: ws, error: String(err) }, 'orphan reconcile failed')
     }
