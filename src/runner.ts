@@ -12,7 +12,7 @@ export interface AgentRunner {
 
 export async function spawnAgent(issue: IssueInfo, ws: string, attempt?: number): Promise<number> {
   const prompt = await buildPrompt(issue, { attempt, repoPath: config.repoPath })
-  const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'a')
+  const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'w')
   const exitCodeFile = path.join(LOCKS, `${issue.id}.exit`)
   const child = spawn('sh', ['-c', 'claude -p "$1"; echo $? > "$2"', '_', prompt, exitCodeFile], {
     cwd: ws,

@@ -1,6 +1,7 @@
+import { execSync } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { config, LOCKS, LOGS, log } from './config.js'
+import { config, LOCKS, LOGS, WORKSPACES, log } from './config.js'
 import { sanitize } from './workspace.js'
 
 export interface Lock {
@@ -137,15 +138,17 @@ export async function detectStalls(): Promise<void> {
     if (!lock || !isAlive(lock.pid)) continue
 
     const logPath = path.join(LOGS, `${sanitize(lock.identifier)}.log`)
-    let mtime: Date
+    const startedAtMs = new Date(lock.startedAt).getTime()
+    let mtime: number
     try {
       const stat = await fs.stat(logPath)
-      mtime = stat.mtime
+      mtime = stat.mtime.getTime()
     } catch {
-      mtime = new Date(lock.startedAt)
+      mtime = 0
     }
 
-    const idleMs = Date.now() - mtime.getTime()
+    const baseline = Math.max(startedAtMs, mtime)
+    const idleMs = Date.now() - baseline
     if (idleMs < config.stallTimeoutMs) continue
 
     log.warn(
@@ -163,5 +166,9 @@ export async function detectStalls(): Promise<void> {
       }
     }
     await removeLock(lock.issueId)
+
+    try {
+      execSync(`git worktree remove "${path.join(WORKSPACES, sanitize(lock.identifier))}" --force`, { cwd: config.repoPath, stdio: 'pipe' })
+    } catch {}
   }
 }
