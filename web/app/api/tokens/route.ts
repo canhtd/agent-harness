@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 
@@ -27,7 +27,7 @@ export async function GET() {
 
   let content: string
   try {
-    content = fs.readFileSync(filePath, 'utf-8')
+    content = await fs.readFile(filePath, 'utf-8')
   } catch {
     return NextResponse.json({ sessions: [] })
   }

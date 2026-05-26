@@ -1,18 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
-interface TokenRecord {
-  task: string
-  date: string
-  model: string
-  turns: number
-  input_tokens: number
-  output_tokens: number
-  cache_creation_tokens: number
-  cache_read_tokens: number
-  estimated_cost_usd: number
-}
+import type { TokenRecord } from "@/app/api/tokens/route"
 
 type SortKey =
   | "task"
@@ -31,9 +20,9 @@ function formatTokens(n: number): string {
 }
 
 function costColor(cost: number): string {
-  if (cost > 15) return "var(--cost-red)"
-  if (cost >= 8) return "var(--cost-yellow)"
-  return "var(--cost-green)"
+  if (cost > 15) return "var(--color-cost-red)"
+  if (cost >= 8) return "var(--color-cost-yellow)"
+  return "var(--color-cost-green)"
 }
 
 export default function Home() {
@@ -130,7 +119,7 @@ export default function Home() {
               </thead>
               <tbody>
                 {sorted.map((s, i) => (
-                  <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-black/[0.02]"}>
+                  <tr key={s.task + s.date} className={i % 2 === 0 ? "bg-white" : "bg-black/[0.02]"}>
                     <td className="px-4 py-3 font-medium text-ink">{s.task}</td>
                     <td className="px-4 py-3 text-muted">{new Date(s.date).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-muted font-mono text-xs">{s.model}</td>
