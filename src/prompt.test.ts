@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs/promises'
 import type { IssueInfo } from './linear.js'
 
 function makeIssue(overrides: Partial<IssueInfo> = {}): IssueInfo {
@@ -61,5 +62,47 @@ describe('prompt routing', () => {
     const prompt = await buildPrompt(makeIssue({ stateName: 'Rework' }), { repoPath: '/nonexistent' })
     expect(prompt).toContain('Write tests that verify each acceptance criterion')
     expect(prompt).toContain('REWORK')
+  })
+})
+
+describe('handoff injection', () => {
+  beforeEach(() => {
+    vi.spyOn(fs, 'readFile')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('appends handoff content to prompt when attempt > 1 and handoff file exists', async () => {
+    const handoffContent = '# Handoff — Attempt 1\n\n## Tried & Failed\nFix the imports'
+    vi.mocked(fs.readFile).mockImplementation(async (p: any) => {
+      if (typeof p === 'string' && p.includes('handoffs')) return handoffContent
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
+
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 2, repoPath: '/nonexistent' })
+
+    expect(prompt).toContain('## Previous Attempt Handoff')
+    expect(prompt).toContain('Fix the imports')
+    expect(prompt).toContain('IMPORTANT: Read the handoff above. Do NOT repeat the same mistakes.')
+  })
+
+  it('does not append handoff for attempt 1', async () => {
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 1, repoPath: '/nonexistent' })
+
+    expect(prompt).not.toContain('Previous Attempt Handoff')
+  })
+
+  it('does not crash when handoff file does not exist on attempt > 1', async () => {
+    vi.mocked(fs.readFile).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 2, repoPath: '/nonexistent' })
+
+    expect(prompt).not.toContain('Previous Attempt Handoff')
+    expect(prompt).toContain('ENG-99')
   })
 })
