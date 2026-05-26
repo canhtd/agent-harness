@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises'
-import { config, LOCKS, WORKSPACES, LOGS, log } from './config.js'
+import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToBlocked, postComment } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
@@ -10,11 +10,12 @@ import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
 import { findSessionJsonl, aggregateTokens, appendTokenRecord } from './tokens.js'
+import { writeHandoff, removeHandoff } from './handoff.js'
 
 export async function tick(): Promise<void> {
   log.info('tick start')
 
-  for (const dir of [LOCKS, WORKSPACES, LOGS])
+  for (const dir of [LOCKS, WORKSPACES, LOGS, HANDOFFS])
     await fs.mkdir(dir, { recursive: true })
 
   const [activeLocks, worktrees] = await Promise.all([
@@ -194,7 +195,10 @@ async function reconcile(): Promise<void> {
 
       if (attempt < config.maxAttempts) {
         const prNumber = getOpenPrNumber(issue.identifier)
-        if (prNumber) closePr(prNumber)
+
+        await writeHandoff(issue.id, issue.identifier, attempt, turn, prNumber)
+
+        if (prNumber !== null) closePr(prNumber)
         try { await removeWorktree(issue.identifier) } catch {}
 
         const nextAttempt = attempt + 1
@@ -294,6 +298,7 @@ async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
       }
 
       try { removeWorktree(lock.identifier) } catch {}
+      await removeHandoff(lock.identifier)
     } catch (err) {
       log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, error: String(err) }, 'terminal reconcile failed')
     }
@@ -316,6 +321,7 @@ async function reconcileTerminal(hooks: HooksConfig): Promise<void> {
       }
 
       try { removeWorktree(ws) } catch {}
+      await removeHandoff(ws)
     } catch (err) {
       log.warn({ issueIdentifier: ws, error: String(err) }, 'orphan reconcile failed')
     }

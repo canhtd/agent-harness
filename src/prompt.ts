@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Liquid } from 'liquidjs'
 import type { IssueInfo } from './linear.js'
+import { readHandoff } from './handoff.js'
 
 interface WorkflowFile {
   config: Record<string, string>
@@ -130,26 +131,44 @@ export async function buildPrompt(
   const templateFile = issue.stateName === 'Rework' ? 'WORKFLOW_REWORK.md' : 'WORKFLOW.md'
   const fallback = issue.stateName === 'Rework' ? reworkPrompt : defaultPrompt
 
-  let raw: string
+  let base: string
   try {
-    raw = await fs.readFile(path.join(opts.repoPath, templateFile), 'utf-8')
-  } catch {
-    return fallback(issue)
+    const raw = await fs.readFile(path.join(opts.repoPath, templateFile), 'utf-8')
+    const { body } = parseFrontMatter(raw)
+    const engine = new Liquid()
+    base = await engine.parseAndRender(body, {
+      issue: {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description ?? '',
+        priority: issue.priority ?? null,
+        labels: issue.labels,
+        stateName: issue.stateName,
+      },
+      attempt: opts.attempt ?? null,
+    })
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+      base = fallback(issue)
+    } else {
+      throw err
+    }
   }
 
-  const { body } = parseFrontMatter(raw)
+  if (opts.attempt && opts.attempt > 1) {
+    const handoff = await readHandoff(issue.identifier)
+    if (handoff) {
+      return [
+        base,
+        '',
+        '## Previous Attempt Handoff',
+        handoff,
+        '',
+        'IMPORTANT: Read the handoff above. Do NOT repeat the same mistakes. Address every review point.',
+      ].join('\n')
+    }
+  }
 
-  const engine = new Liquid()
-  return engine.parseAndRender(body, {
-    issue: {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      description: issue.description ?? '',
-      priority: issue.priority ?? null,
-      labels: issue.labels,
-      stateName: issue.stateName,
-    },
-    attempt: opts.attempt ?? null,
-  })
+  return base
 }

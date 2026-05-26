@@ -16,6 +16,7 @@ vi.mock('./config.js', () => ({
   LOCKS: '/tmp/locks',
   WORKSPACES: '/tmp/workspaces',
   LOGS: '/tmp/logs',
+  HANDOFFS: '/tmp/handoffs',
   log: logger,
 }))
 
@@ -83,6 +84,11 @@ vi.mock('./tokens.js', () => ({
   appendTokenRecord: vi.fn(),
 }))
 
+vi.mock('./handoff.js', () => ({
+  writeHandoff: vi.fn().mockResolvedValue(undefined),
+  removeHandoff: vi.fn().mockResolvedValue(undefined),
+}))
+
 describe('tick health check', () => {
   beforeEach(() => {
     logLines.length = 0
@@ -116,6 +122,7 @@ describe('reconcile: fresh attempt on max turns', () => {
     const linear = await import('./linear.js')
     const github = await import('./github.js')
     const workspace = await import('./workspace.js')
+    const handoff = await import('./handoff.js')
 
     vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
       { id: 'issue-1', identifier: 'ENG-50', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
@@ -131,6 +138,7 @@ describe('reconcile: fresh attempt on max turns', () => {
     const { tick } = await import('./orchestrator.js')
     await tick()
 
+    expect(vi.mocked(handoff.writeHandoff)).toHaveBeenCalledWith('issue-1', 'ENG-50', 1, 5, 42)
     expect(vi.mocked(github.closePr)).toHaveBeenCalledWith(42)
     expect(vi.mocked(workspace.removeWorktree)).toHaveBeenCalledWith('ENG-50')
     expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
@@ -272,5 +280,30 @@ describe('reconcile: PR status checked before max turns', () => {
 
     const freshLine = logLines.find((l) => l.includes('fresh attempt 2/3'))
     expect(freshLine).toBeDefined()
+  })
+})
+
+describe('reconcileTerminal: handoff cleanup', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('removes handoff file when issue transitions to terminal state', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const handoff = await import('./handoff.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-10', identifier: 'ENG-70', startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 3 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(linear.fetchIssueState).mockResolvedValue({ terminal: true, stateName: 'Done' })
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([])
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(handoff.removeHandoff)).toHaveBeenCalledWith('ENG-70')
   })
 })
