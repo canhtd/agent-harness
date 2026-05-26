@@ -230,6 +230,10 @@ async function reconcile(): Promise<void> {
     )
 
     try {
+      await postComment(issue.id, `**Turn ${nextTurn}**: ${outcome.reason}`)
+    } catch {}
+
+    try {
       const { path: ws } = await ensureWorktree(issue.identifier)
       const pid = isFreshAttempt
         ? await spawnAgent(issue, ws, attempt)

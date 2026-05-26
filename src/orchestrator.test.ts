@@ -177,6 +177,70 @@ describe('reconcile: fresh attempt on max turns', () => {
   })
 })
 
+describe('reconcile: redispatch posts turn feedback comment', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('posts comment with turn number and reason on redispatch', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const workspace = await import('./workspace.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-fb', identifier: 'ENG-70', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-fb', identifier: 'ENG-70',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'typecheck failed' })
+    vi.mocked(workspace.ensureWorktree).mockResolvedValue({ path: '/tmp/workspaces/ENG-70', created: false })
+    vi.mocked(runner.spawnContinuation).mockResolvedValue(5555)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-fb',
+      '**Turn 3**: typecheck failed',
+    )
+  })
+
+  it('does not block dispatch when comment posting fails', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const workspace = await import('./workspace.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-fc', identifier: 'ENG-71', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-fc', identifier: 'ENG-71',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 1, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'tests failed' })
+    vi.mocked(linear.postComment).mockRejectedValue(new Error('Linear API timeout'))
+    vi.mocked(workspace.ensureWorktree).mockResolvedValue({ path: '/tmp/workspaces/ENG-71', created: false })
+    vi.mocked(runner.spawnContinuation).mockResolvedValue(6666)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnContinuation)).toHaveBeenCalled()
+    expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
+      expect.objectContaining({ pid: 6666, turn: 2 }),
+    )
+  })
+})
+
 describe('reconcile: PR status checked before max turns', () => {
   beforeEach(() => {
     logLines.length = 0
