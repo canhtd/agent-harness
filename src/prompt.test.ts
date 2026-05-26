@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { IssueInfo } from './linear.js'
+
+vi.mock('./handoff.js', () => ({
+  readHandoff: vi.fn().mockResolvedValue(null),
+}))
 
 function makeIssue(overrides: Partial<IssueInfo> = {}): IssueInfo {
   return {
@@ -61,5 +65,40 @@ describe('prompt routing', () => {
     const prompt = await buildPrompt(makeIssue({ stateName: 'Rework' }), { repoPath: '/nonexistent' })
     expect(prompt).toContain('Write tests that verify each acceptance criterion')
     expect(prompt).toContain('REWORK')
+  })
+})
+
+describe('handoff injection', () => {
+  it('appends handoff content when attempt > 1 and handoff exists', async () => {
+    const handoff = await import('./handoff.js')
+    vi.mocked(handoff.readHandoff).mockResolvedValue('# Handoff — Attempt 1\n\n## Tried & Failed\nFix the type errors')
+
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 2, repoPath: '/nonexistent' })
+
+    expect(prompt).toContain('## Previous Attempt Handoff')
+    expect(prompt).toContain('Fix the type errors')
+    expect(prompt).toContain('IMPORTANT: Read the handoff above. Do NOT repeat the same mistakes.')
+  })
+
+  it('does not append handoff on attempt 1', async () => {
+    const handoff = await import('./handoff.js')
+    vi.mocked(handoff.readHandoff).mockResolvedValue('# Handoff content')
+
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 1, repoPath: '/nonexistent' })
+
+    expect(prompt).not.toContain('Previous Attempt Handoff')
+  })
+
+  it('does not crash when no handoff file exists for attempt > 1', async () => {
+    const handoff = await import('./handoff.js')
+    vi.mocked(handoff.readHandoff).mockResolvedValue(null)
+
+    const { buildPrompt } = await import('./prompt.js')
+    const prompt = await buildPrompt(makeIssue(), { attempt: 2, repoPath: '/nonexistent' })
+
+    expect(prompt).not.toContain('Previous Attempt Handoff')
+    expect(prompt).toContain('ENG-99')
   })
 })
