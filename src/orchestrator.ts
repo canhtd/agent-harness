@@ -142,7 +142,7 @@ export async function tick(): Promise<void> {
   )
 }
 
-export async function writeHandoff(identifier: string, attempt: number, turns: number, prNumber: number | null): Promise<void> {
+export async function writeHandoff(issueId: string, identifier: string, attempt: number, turns: number, prNumber: number | null): Promise<void> {
   const key = sanitize(identifier)
 
   let reviewBody = ''
@@ -170,7 +170,7 @@ export async function writeHandoff(identifier: string, attempt: number, turns: n
   ].join('\n')
 
   await fs.writeFile(path.join(HANDOFFS, `${key}.md`), handoff, 'utf-8')
-  log.info({ issueIdentifier: identifier, attempt }, 'handoff written')
+  log.info({ issueId, issueIdentifier: identifier, attempt }, 'handoff written')
 }
 
 export async function removeHandoff(identifier: string): Promise<void> {
@@ -199,7 +199,7 @@ async function reconcile(): Promise<void> {
 
       if (attempt < config.maxAttempts) {
         const prNumber = getOpenPrNumber(issue.identifier)
-        await writeHandoff(issue.identifier, attempt, turn, prNumber)
+        await writeHandoff(issue.id, issue.identifier, attempt, turn, prNumber)
         if (prNumber) closePr(prNumber)
         try { await removeWorktree(issue.identifier) } catch {}
 

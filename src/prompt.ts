@@ -151,10 +151,15 @@ export async function buildPrompt(
   const templateFile = issue.stateName === 'Rework' ? 'WORKFLOW_REWORK.md' : 'WORKFLOW.md'
   const fallback = issue.stateName === 'Rework' ? reworkPrompt : defaultPrompt
 
-  let raw: string
   let base: string
+  let raw: string | undefined
   try {
     raw = await fs.readFile(path.join(opts.repoPath, templateFile), 'utf-8')
+  } catch {
+    // no template file — use fallback
+  }
+
+  if (raw !== undefined) {
     const { body } = parseFrontMatter(raw)
     const engine = new Liquid()
     base = await engine.parseAndRender(body, {
@@ -169,7 +174,7 @@ export async function buildPrompt(
       },
       attempt: opts.attempt ?? null,
     })
-  } catch {
+  } else {
     base = fallback(issue)
   }
 

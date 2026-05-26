@@ -232,7 +232,7 @@ describe('writeHandoff', () => {
     vi.mocked(fsModule.default.readFile).mockResolvedValue('line 1\nline 2\nline 3')
 
     const { writeHandoff } = await import('./orchestrator.js')
-    await writeHandoff('ENG-50', 1, 5, 42)
+    await writeHandoff('issue-1', 'ENG-50', 1, 5, 42)
 
     expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
       '/tmp/handoffs/ENG-50.md',
@@ -264,7 +264,7 @@ describe('writeHandoff', () => {
     vi.mocked(fsModule.default.readFile).mockRejectedValue(new Error('ENOENT'))
 
     const { writeHandoff } = await import('./orchestrator.js')
-    await writeHandoff('ENG-50', 1, 5, 42)
+    await writeHandoff('issue-1', 'ENG-50', 1, 5, 42)
 
     expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
       '/tmp/handoffs/ENG-50.md',
@@ -278,7 +278,7 @@ describe('writeHandoff', () => {
     vi.mocked(fsModule.default.readFile).mockRejectedValue(new Error('ENOENT'))
 
     const { writeHandoff } = await import('./orchestrator.js')
-    await writeHandoff('ENG-50', 1, 5, null)
+    await writeHandoff('issue-1', 'ENG-50', 1, 5, null)
 
     expect(vi.mocked(fsModule.default.writeFile)).toHaveBeenCalledWith(
       '/tmp/handoffs/ENG-50.md',
