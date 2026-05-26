@@ -40,7 +40,7 @@ CI cần `pnpm install --ignore-scripts` vì esbuild postinstall bị block. Loc
 
 ## Stall detection và poll interval
 
-Stall detection chạy mỗi tick. Với poll interval = 30s, detection latency tối đa 30s sau khi vượt stall timeout. Default: stall timeout = 180s, poll interval = 30s. Không cần stall timeout < poll interval — chỉ cần stall timeout đủ lớn để tránh false positive.
+Stall detection chạy mỗi tick. Với poll interval = 30s, detection latency tối đa 30s sau khi vượt stall timeout. Default: stall timeout = 600s, poll interval = 30s. Agent spawn dùng `--output-format stream-json` để log file mtime update liên tục → stall detection dựa trên mtime hoạt động đúng.
 
 ## Linear priority 0 = no priority
 
