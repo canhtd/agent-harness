@@ -1,14 +1,9 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
-# Resolve PATH for node/pnpm — supports nvm, fnm, volta, and system installs
-if [ -f "$HOME/.bashrc" ]; then
-  source "$HOME/.bashrc" 2>/dev/null
-elif [ -f "$HOME/.zshrc" ]; then
-  source "$HOME/.zshrc" 2>/dev/null
-elif [ -f "$HOME/.profile" ]; then
-  source "$HOME/.profile" 2>/dev/null
-fi
+# Resolve PATH via user's login shell (handles nvm, fnm, volta, any version manager)
+USER_SHELL="${SHELL:-/bin/zsh}"
+RESOLVED_PATH="$("$USER_SHELL" -lc 'echo $PATH' 2>/dev/null)" && export PATH="$RESOLVED_PATH"
 
 while true; do
   git pull origin main --ff-only 2>/dev/null

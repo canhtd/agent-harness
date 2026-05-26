@@ -13,8 +13,13 @@ mkdir -p "$HOME/.agent-harness/logs"
 # Remove existing agent if loaded
 launchctl bootout "$SERVICE_TARGET" 2>/dev/null || true
 
+# Escape XML special characters in paths
+xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+REPO_PATH_ESC="$(xml_escape "$REPO_PATH")"
+HOME_ESC="$(xml_escape "$HOME")"
+
 # Substitute placeholders and install
-sed -e "s|__REPO_PATH__|$REPO_PATH|g" -e "s|__HOME__|$HOME|g" "$PLIST_SRC" > "$PLIST_DEST"
+sed -e "s|__REPO_PATH__|$REPO_PATH_ESC|g" -e "s|__HOME__|$HOME_ESC|g" "$PLIST_SRC" > "$PLIST_DEST"
 
 echo "Installed plist to $PLIST_DEST"
 
