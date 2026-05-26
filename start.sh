@@ -3,7 +3,8 @@ cd "$(dirname "$0")"
 
 # Resolve PATH via user's login shell (handles nvm, fnm, volta, any version manager)
 USER_SHELL="${SHELL:-/bin/zsh}"
-RESOLVED_PATH="$("$USER_SHELL" -lc 'echo $PATH' 2>/dev/null)" && export PATH="$RESOLVED_PATH"
+RESOLVED_PATH="$("$USER_SHELL" -lc 'echo $PATH' 2>/dev/null | tail -1)"
+[ -n "$RESOLVED_PATH" ] && export PATH="$RESOLVED_PATH"
 
 while true; do
   git pull origin main --ff-only 2>/dev/null

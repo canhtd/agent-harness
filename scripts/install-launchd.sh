@@ -18,8 +18,10 @@ xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>
 REPO_PATH_ESC="$(xml_escape "$REPO_PATH")"
 HOME_ESC="$(xml_escape "$HOME")"
 
-# Substitute placeholders and install
-sed -e "s|__REPO_PATH__|$REPO_PATH_ESC|g" -e "s|__HOME__|$HOME_ESC|g" "$PLIST_SRC" > "$PLIST_DEST"
+# Substitute placeholders and install (awk avoids sed delimiter collisions)
+awk -v repo="$REPO_PATH_ESC" -v home="$HOME_ESC" \
+  '{ gsub(/__REPO_PATH__/, repo); gsub(/__HOME__/, home); print }' \
+  "$PLIST_SRC" > "$PLIST_DEST"
 
 echo "Installed plist to $PLIST_DEST"
 
