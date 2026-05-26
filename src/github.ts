@@ -62,6 +62,13 @@ export function checkPrStatus(identifier: string): PrOutcome {
   }
 
   if (reviewState === 'approved') {
+    if (mergePr(openPr.number)) {
+      return { action: 'done' }
+    }
+    return { action: 'skip', reason: 'merge failed, will retry' }
+  }
+
+  if (reviewState === 'approved') {
     const merged = mergePr(openPr.number)
     if (merged) return { action: 'done' }
     return { action: 'skip', reason: 'merge failed, will retry' }
@@ -127,10 +134,10 @@ function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'n
   }
 }
 
-function hasNewCommitsSinceReview(prNumber: number): boolean {
+export function hasNewCommitsSinceReview(prNumber: number): boolean {
   try {
     const raw = execSync(
-      `gh pr view ${prNumber} --json reviews,commits --jq '{lastReview: (.reviews | sort_by(.submittedAt) | last | .submittedAt), lastCommit: (.commits | last | .committedDate)}'`,
+      `gh pr view ${prNumber} --json reviews,commits --jq '{ lastReview: ([.reviews[] | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")] | sort_by(.submittedAt) | last | .submittedAt), lastCommit: (.commits | last | .committedDate) }'`,
       { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
     ).toString().trim()
     const { lastReview, lastCommit } = JSON.parse(raw)
@@ -149,7 +156,7 @@ export function mergePr(prNumber: number): boolean {
       timeout: 30_000,
     })
   } catch {
-    log.warn({ prNumber }, 'CI checks not passing — skipping merge')
+    log.warn({ prNumber }, 'PR merge skipped — CI checks not passing')
     return false
   }
 
@@ -157,12 +164,12 @@ export function mergePr(prNumber: number): boolean {
     execSync(`gh pr merge ${prNumber} --squash`, {
       cwd: config.repoPath,
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 30_000,
+      timeout: 60_000,
     })
-    log.info({ prNumber }, 'PR merged via squash')
+    log.info({ prNumber }, 'PR auto-merged')
     return true
   } catch (err) {
-    log.warn({ prNumber, error: String(err) }, 'merge failed')
+    log.warn({ prNumber, error: String(err) }, 'PR merge failed')
     return false
   }
 }
