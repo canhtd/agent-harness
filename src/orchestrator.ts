@@ -156,34 +156,6 @@ async function reconcile(): Promise<void> {
     }
 
     const turn = lock ? (lock.turn ?? 1) : 0
-    if (turn >= config.maxTurns) {
-      const attempt = lock?.attempt ?? 1
-
-      if (attempt < config.maxAttempts) {
-        const prNumber = getOpenPrNumber(issue.identifier)
-        if (prNumber) closePr(prNumber)
-        try { await removeWorktree(issue.identifier) } catch {}
-
-        const nextAttempt = attempt + 1
-        log.info(
-          { issueId: issue.id, issueIdentifier: issue.identifier, attempt: nextAttempt, maxAttempts: config.maxAttempts },
-          `fresh attempt ${nextAttempt}/${config.maxAttempts}`,
-        )
-        await writeLock({
-          pid: -1,
-          issueId: issue.id,
-          identifier: issue.identifier,
-          startedAt: new Date().toISOString(),
-          attempt: nextAttempt,
-          turn: 0,
-          stateName: issue.stateName,
-          exitCode: 0,
-        })
-      } else {
-        await escalateToHuman(issue, lock)
-      }
-      continue
-    }
 
     log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'reconciling')
 
@@ -214,6 +186,35 @@ async function reconcile(): Promise<void> {
 
     if (outcome.action === 'skip') {
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, reason: outcome.reason }, 'skipping')
+      continue
+    }
+
+    if (turn >= config.maxTurns) {
+      const attempt = lock?.attempt ?? 1
+
+      if (attempt < config.maxAttempts) {
+        const prNumber = getOpenPrNumber(issue.identifier)
+        if (prNumber) closePr(prNumber)
+        try { await removeWorktree(issue.identifier) } catch {}
+
+        const nextAttempt = attempt + 1
+        log.info(
+          { issueId: issue.id, issueIdentifier: issue.identifier, attempt: nextAttempt, maxAttempts: config.maxAttempts },
+          `fresh attempt ${nextAttempt}/${config.maxAttempts}`,
+        )
+        await writeLock({
+          pid: -1,
+          issueId: issue.id,
+          identifier: issue.identifier,
+          startedAt: new Date().toISOString(),
+          attempt: nextAttempt,
+          turn: 0,
+          stateName: issue.stateName,
+          exitCode: 0,
+        })
+      } else {
+        await escalateToHuman(issue, lock)
+      }
       continue
     }
 
