@@ -56,19 +56,18 @@ export function checkPrStatus(identifier: string): PrOutcome {
   }
 
   const reviewState = getReviewState(openPr.number)
+
+  if (reviewState !== 'none' && hasNewCommitsSinceReview(openPr.number)) {
+    return { action: 'review', prNumber: openPr.number }
+  }
+
   if (reviewState === 'approved') {
-    if (hasNewCommitsSinceReview(openPr.number)) {
-      return { action: 'review', prNumber: openPr.number }
-    }
     if (mergePr(openPr.number)) {
       return { action: 'done' }
     }
     return { action: 'skip', reason: 'merge failed, will retry' }
   }
   if (reviewState === 'changes_requested') {
-    if (hasNewCommitsSinceReview(openPr.number)) {
-      return { action: 'review', prNumber: openPr.number }
-    }
     const reviewBody = fetchLastReviewBody(openPr.number)
     const reason = reviewBody
       ? `review requested changes:\n\n${reviewBody}`
@@ -117,7 +116,7 @@ export function closePr(prNumber: number): void {
 function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'none' {
   try {
     const raw = execSync(
-      `gh pr view ${prNumber} --json reviews --jq '[.reviews[] | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")] | sort_by(.submittedAt) | last | .state'`,
+      `gh pr view ${prNumber} --json reviewDecision --jq '.reviewDecision'`,
       { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
     ).toString().trim()
     if (raw === 'APPROVED') return 'approved'
@@ -143,6 +142,17 @@ export function hasNewCommitsSinceReview(prNumber: number): boolean {
 }
 
 export function mergePr(prNumber: number): boolean {
+  try {
+    execSync(`gh pr checks ${prNumber} --fail-fast`, {
+      cwd: config.repoPath,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 30_000,
+    })
+  } catch {
+    log.warn({ prNumber }, 'PR merge skipped — CI checks not passing')
+    return false
+  }
+
   try {
     execSync(`gh pr merge ${prNumber} --squash`, {
       cwd: config.repoPath,
