@@ -52,9 +52,14 @@ function runClaude(prompt: string): Promise<string> {
   })
 }
 
-async function runSingleReview(prNumber: number, diff: string, reviewer: typeof REVIEWERS[number]): Promise<ReviewResult> {
+async function runSingleReview(prNumber: number, diff: string, reviewer: typeof REVIEWERS[number], issueDescription: string): Promise<ReviewResult> {
   const skill = await loadSkillPrompt(reviewer.skill)
-  const prompt = [skill, '', '## PR Diff', '', '```diff', diff, '```'].join('\n')
+  const parts = [skill, '']
+  if (issueDescription) {
+    parts.push('## Issue Description & Acceptance Criteria', '', issueDescription, '')
+  }
+  parts.push('## PR Diff', '', '```diff', diff, '```')
+  const prompt = parts.join('\n')
 
   log.info({ prNumber, reviewer: reviewer.name }, 'review started')
 
@@ -66,7 +71,7 @@ async function runSingleReview(prNumber: number, diff: string, reviewer: typeof 
   return { reviewer: reviewer.name, approved, body }
 }
 
-export async function reviewPr(prNumber: number): Promise<{ approved: boolean; results: ReviewResult[] }> {
+export async function reviewPr(prNumber: number, issueDescription: string = ''): Promise<{ approved: boolean; results: ReviewResult[] }> {
   const diff = getPrDiff(prNumber)
   if (!diff.trim()) {
     log.warn({ prNumber }, 'empty diff, skipping review')
@@ -74,7 +79,7 @@ export async function reviewPr(prNumber: number): Promise<{ approved: boolean; r
   }
 
   const results = await Promise.all(
-    REVIEWERS.map((r) => runSingleReview(prNumber, diff, r).catch((err): ReviewResult => {
+    REVIEWERS.map((r) => runSingleReview(prNumber, diff, r, issueDescription).catch((err): ReviewResult => {
       log.error({ prNumber, reviewer: r.name, error: String(err) }, 'review failed')
       return { reviewer: r.name, approved: false, body: `**[${r.name}]** Review failed: ${err}` }
     })),

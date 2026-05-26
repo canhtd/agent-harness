@@ -173,7 +173,7 @@ async function reconcile(): Promise<void> {
     if (outcome.action === 'review') {
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'triggering review')
       try {
-        const review = await reviewPr(outcome.prNumber)
+        const review = await reviewPr(outcome.prNumber, issue.description ?? '')
         if (review.approved) {
           log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review approved — awaiting merge')
         } else {
