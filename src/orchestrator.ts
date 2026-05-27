@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, BABYSIT_STATE, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock, type Lock } from './lockfile.js'
-import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToBlocked, postComment } from './linear.js'
+import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToInProgress, transitionToBlocked, postComment } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
 import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
 import type { IssueInfo } from './linear.js'
@@ -132,6 +132,7 @@ export async function tick(): Promise<void> {
         lastExitCode: prevLock?.exitCode,
       })
       if (isRework) reworkRunning++
+      if (issue.stateName === 'Todo') transitionToInProgress(issue.id).catch(() => {})
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, attempt }, 'agent spawned')
     } catch (err) {
       log.error({ issueIdentifier: issue.identifier, error: String(err) }, 'dispatch failed')
