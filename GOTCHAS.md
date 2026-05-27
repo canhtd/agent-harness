@@ -80,9 +80,12 @@ Khi agent bị kill giữa chừng `git rebase`, worktree giữ lại `rebase-me
 
 `claude -p --output-format stream-json` crash với "requires --verbose". Phải luôn kèm `--verbose` flag. ENG-32 merge thiếu flag này → tất cả agent crash. Smoke test (`runner.smoke.test.ts`) sẽ bắt lỗi này — chạy `claude -p` thật với đúng flags trước commit.
 
-## mainHasChanged phải pull trước khi exit
+## pullMainIfChanged phải reset --hard, không dùng --ff-only
 
-`src/index.ts` detect `origin/main` khác local main → exit để systemd restart. Nhưng nếu không `git merge --ff-only origin/main` trước khi exit, restart sẽ chạy code cũ → detect khác → exit lại → loop vô hạn. Đã xảy ra 367 lần restart liên tiếp mà không bao giờ chạy code mới. Function phải pull trước, exit sau.
+`src/index.ts` detect `origin/main` khác local main → pull → exit → systemd restart. Dùng `git reset --hard origin/main` thay vì `git merge --ff-only` vì:
+1. Nếu không pull trước khi exit → restart chạy code cũ → detect khác → exit → loop vô hạn (đã xảy ra 367 lần)
+2. `--ff-only` fail khi local main có commit chưa push (hotfix commit trên local + PR squash merge tạo hash khác → diverge → ff-only reject)
+3. Local main không bao giờ có local-only commits — agents làm việc trong worktree, mọi thay đổi qua PR. `reset --hard` an toàn.
 
 ## Không code tay — tạo issue để agent tự build
 

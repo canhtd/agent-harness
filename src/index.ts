@@ -12,7 +12,7 @@ function pullMainIfChanged(): boolean {
     const local = execSync('git rev-parse main', { cwd: config.repoPath, stdio: 'pipe' }).toString().trim()
     const remote = execSync('git rev-parse origin/main', { cwd: config.repoPath, stdio: 'pipe' }).toString().trim()
     if (local === remote) return false
-    execSync('git merge --ff-only origin/main', { cwd: config.repoPath, stdio: 'pipe', timeout: 15_000 })
+    execSync('git reset --hard origin/main', { cwd: config.repoPath, stdio: 'pipe', timeout: 15_000 })
     return true
   } catch {
     return false

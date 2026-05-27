@@ -59,10 +59,16 @@ Hệ thống tự vận hành ổn định.
 - [x] Stall detection fix — stream-json output + 600s timeout (ENG-32)
 - [x] gh CLI auth fix cho agent env (ENG-33)
 - [x] Turn comment label fix (ENG-34)
-- [ ] Delete remote branch khi close PR fresh attempt (ENG-35)
-- [ ] Smoke test cho CLI spawn flags (ENG-36)
-- [ ] Babysit skill — orchestrator spawn recovery agent khi stuck (ENG-37)
+- [x] Delete remote branch khi close PR fresh attempt (ENG-35)
+- [x] Smoke test cho CLI spawn flags (ENG-36)
+- [x] Babysit skill — orchestrator spawn recovery agent khi stuck (ENG-37)
 - [x] Multi-machine support: Mac + Ubuntu chạy cùng codebase
+- [x] Pull main before restart — reset --hard thay vì chỉ detect (hotfix PR #97)
+- [x] Transition issue sang In Progress khi dispatch agent (hotfix PR #97)
+- [ ] Token dashboard align Symphony style (ENG-38)
+- [ ] Circuit breaker cho review retry loop (ENG-39)
+- [ ] Auto-recover dirty worktree trong before_run hook (ENG-40)
+- [ ] Cost guard — pause issue khi cost vượt threshold (ENG-41)
 
 ### Phase 4: Grader + Bridge (deferred)
 Khi muốn fully autonomous deploy hoặc quality drift detection.
