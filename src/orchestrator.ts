@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises'
+import path from 'node:path'
 import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, BABYSIT_STATE, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock, type Lock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToInProgress, transitionToBlocked, postComment } from './linear.js'
-import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
-import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
+import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath, sanitize } from './workspace.js'
+import { spawnAgent, spawnContinuation, spawnBabysit, spawnResearchAgent } from './runner.js'
 import type { IssueInfo } from './linear.js'
 import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody, getPrHeadSha } from './github.js'
 import { reviewPr } from './review.js'
@@ -36,6 +37,7 @@ export async function tick(): Promise<void> {
 
   for (const agent of completed) {
     const ws = workspacePath(agent.identifier)
+    const lock = await readLock(agent.issueId)
 
     if (hooks.after_run) {
       runHook('after_run', hooks.after_run, ws, hooks.timeout, {
@@ -48,7 +50,6 @@ export async function tick(): Promise<void> {
       const jsonlPath = findSessionJsonl(ws)
       if (jsonlPath) {
         const record = aggregateTokens(jsonlPath, agent.identifier)
-        const lock = await readLock(agent.issueId)
         if (lock) {
           if (lock.startedAt) {
             record.duration_seconds = Math.round((Date.now() - new Date(lock.startedAt).getTime()) / 1000)
@@ -60,6 +61,37 @@ export async function tick(): Promise<void> {
       }
     } catch (err) {
       log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'token aggregation failed')
+    }
+
+    if (lock?.stateName === 'research') {
+      if (lock.exitCode === 0) {
+        try {
+          await transitionToDone(lock.issueId)
+        } catch (err) {
+          log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, error: String(err) }, 'research transition to Done failed')
+        }
+        try {
+          const logPath = path.join(LOGS, `${sanitize(agent.identifier)}.log`)
+          const output = await extractResearchOutput(logPath)
+          if (output) await postComment(lock.issueId, output)
+        } catch (err) {
+          log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, error: String(err) }, 'research comment failed')
+        }
+        await removeLock(lock.issueId)
+        log.info({ issueId: lock.issueId, issueIdentifier: lock.identifier }, 'research complete')
+      } else {
+        const code = lock.exitCode ?? 1
+        try {
+          await postComment(lock.issueId, `Research agent exited with code ${code}`)
+        } catch {}
+        try {
+          await transitionToBlocked(lock.issueId)
+        } catch (err) {
+          log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, error: String(err) }, 'research transition to Blocked failed')
+        }
+        await removeLock(lock.issueId)
+        log.warn({ issueId: lock.issueId, issueIdentifier: lock.identifier, exitCode: code }, 'research agent failed')
+      }
     }
   }
 
@@ -114,6 +146,27 @@ export async function tick(): Promise<void> {
       continue
     }
 
+    const isResearch = issue.labels.some(l => config.researchLabels.includes(l.toLowerCase()))
+    if (isResearch) {
+      try {
+        const pid = spawnResearchAgent(issue)
+        await writeLock({
+          pid,
+          issueId: issue.id,
+          identifier: issue.identifier,
+          startedAt: new Date().toISOString(),
+          attempt: 1,
+          turn: 1,
+          stateName: 'research',
+        })
+        transitionToInProgress(issue.id).catch(() => {})
+        log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid }, 'research agent spawned')
+      } catch (err) {
+        log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'research dispatch failed')
+      }
+      continue
+    }
+
     try {
       const prevLock = await readLock(issue.id)
       const attempt = prevLock?.exitCode !== undefined && prevLock.exitCode !== 0
@@ -160,6 +213,38 @@ export async function tick(): Promise<void> {
   )
 }
 
+async function extractResearchOutput(logPath: string): Promise<string> {
+  let content: string
+  try {
+    content = await fs.readFile(logPath, 'utf-8')
+  } catch {
+    return ''
+  }
+  const lines = content.split('\n').filter(l => l.trim())
+
+  for (const line of lines) {
+    let entry: Record<string, unknown>
+    try { entry = JSON.parse(line) } catch { continue }
+    if (entry.type === 'result' && typeof entry.result === 'string') {
+      return entry.result
+    }
+  }
+
+  const texts: string[] = []
+  for (const line of lines) {
+    let entry: Record<string, unknown>
+    try { entry = JSON.parse(line) } catch { continue }
+    if (entry.type !== 'assistant') continue
+    const msg = entry.message as Record<string, unknown> | undefined
+    const blocks = msg?.content as Array<Record<string, unknown>> | undefined
+    if (!Array.isArray(blocks)) continue
+    for (const block of blocks) {
+      if (block.type === 'text' && typeof block.text === 'string') texts.push(block.text)
+    }
+  }
+  return texts.join('\n\n')
+}
+
 async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
   const inProgress = await fetchInProgressIssues()
   const running = await countRunning()
@@ -171,6 +256,8 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
     const lock = await readLock(issue.id)
 
     if (lock && isAlive(lock.pid)) continue
+
+    if (lock?.stateName === 'research') continue
 
     if (lock?.exitCode !== undefined && lock.exitCode !== 0 && lock.notBefore) {
       if (Date.now() < new Date(lock.notBefore).getTime()) continue

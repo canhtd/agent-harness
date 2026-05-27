@@ -55,8 +55,9 @@ export function spawnResearchAgent(issue: IssueInfo): number {
   const prompt = buildResearchPrompt(issue)
   const promptFile = writePromptFile(`${issue.identifier}-research`, prompt)
   const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'w')
+  const exitCodeFile = path.join(LOCKS, `${issue.id}.exit`)
   const { GITHUB_BOT_TOKEN: _, ...agentEnv } = process.env
-  const child = spawn('sh', ['-c', 'claude -p < "$1" --verbose --output-format stream-json', '_', promptFile], {
+  const child = spawn('sh', ['-c', 'claude -p < "$1" --verbose --output-format stream-json; echo $? > "$2"', '_', promptFile, exitCodeFile], {
     cwd: config.repoPath,
     stdio: ['ignore', fd, fd],
     detached: true,
