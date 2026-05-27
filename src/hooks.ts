@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process'
 import fs from 'node:fs/promises'
+import fsSync from 'node:fs'
 import path from 'node:path'
 import { log } from './config.js'
 
@@ -46,6 +47,50 @@ export async function loadHooksConfig(repoPath: string): Promise<HooksConfig> {
   }
 }
 
+export function recoverWorktree(
+  ws: string,
+  meta: { issueId: string; issueIdentifier: string },
+): boolean {
+  const recovered: string[] = []
+
+  try {
+    const gitDir = execSync('git rev-parse --git-dir', { cwd: ws, stdio: 'pipe' }).toString().trim()
+    const absGitDir = path.resolve(ws, gitDir)
+
+    let removedRebase = false
+    for (const name of ['rebase-merge', 'rebase-apply']) {
+      const dirPath = path.join(absGitDir, name)
+      if (fsSync.existsSync(dirPath)) {
+        fsSync.rmSync(dirPath, { recursive: true })
+        removedRebase = true
+      }
+    }
+    if (removedRebase) recovered.push('stale-rebase')
+  } catch (err) {
+    log.warn({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, error: String(err) }, 'rebase state recovery failed')
+  }
+
+  try {
+    const status = execSync('git status --porcelain', { cwd: ws, stdio: 'pipe' }).toString().trim()
+    if (status) {
+      execSync('git checkout -- .', { cwd: ws, stdio: 'pipe' })
+      execSync('git clean -fd', { cwd: ws, stdio: 'pipe' })
+      recovered.push('unstaged-changes')
+    }
+  } catch (err) {
+    log.warn({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, error: String(err) }, 'dirty worktree recovery failed')
+  }
+
+  if (recovered.length > 0) {
+    log.info(
+      { issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, recoveryType: recovered },
+      'worktree auto-recovered',
+    )
+    return true
+  }
+  return false
+}
+
 export function runHook(
   name: HookName,
   script: string,
@@ -62,7 +107,26 @@ export function runHook(
     })
     log.info({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, hook: name }, 'hook ok')
   } catch (err) {
-    if (name === 'after_create' || name === 'before_run') {
+    if (name === 'before_run') {
+      const recovered = recoverWorktree(ws, meta)
+      if (recovered) {
+        try {
+          execSync(script, {
+            cwd: ws,
+            stdio: 'pipe',
+            timeout: timeoutSec * 1000,
+          })
+          log.info({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, hook: name }, 'hook ok after recovery')
+          return
+        } catch (retryErr) {
+          log.error({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, hook: name, error: String(retryErr) }, 'hook failed after recovery, aborting')
+          throw new Error(`hook ${name} failed after recovery: ${retryErr}`)
+        }
+      }
+      log.error({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, hook: name, error: String(err) }, 'hook failed, aborting')
+      throw new Error(`hook ${name} failed: ${err}`)
+    }
+    if (name === 'after_create') {
       log.error({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, hook: name, error: String(err) }, 'hook failed, aborting')
       throw new Error(`hook ${name} failed: ${err}`)
     }
