@@ -74,6 +74,12 @@ export async function GET() {
       },
       body: JSON.stringify({ query: QUERY, variables: { teamKey } }),
     });
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: `Linear API returned ${res.status}`, issues: [] },
+        { status: 502 },
+      );
+    }
     data = await res.json();
   } catch (err) {
     return NextResponse.json(
@@ -82,9 +88,9 @@ export async function GET() {
     );
   }
 
-  if (data.errors) {
+  if (data.errors?.length) {
     return NextResponse.json(
-      { error: data.errors[0].message, issues: [] },
+      { error: data.errors[0]?.message ?? "Unknown GraphQL error", issues: [] },
       { status: 502 },
     );
   }
