@@ -10,7 +10,7 @@ export const config = {
   repoPath: process.env.REPO_PATH || process.cwd(),
   maxConcurrent: 10,
   maxReworkConcurrent: 2,
-  stallTimeoutMs: Number(process.env.STALL_TIMEOUT_MS) || 180_000,
+  stallTimeoutMs: Number(process.env.STALL_TIMEOUT_MS) || 600_000,
   maxTurns: Number(process.env.MAX_TURNS) || 5,
   maxAttempts: Number(process.env.MAX_ATTEMPTS) || 3,
 }
