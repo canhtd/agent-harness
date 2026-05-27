@@ -9,7 +9,7 @@ import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastR
 import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
-import { findSessionJsonl, aggregateTokens, appendTokenRecord } from './tokens.js'
+import { findSessionJsonl, aggregateTokens, appendTokenRecord, getCumulativeCost } from './tokens.js'
 import { writeHandoff, removeHandoff } from './handoff.js'
 
 export async function tick(): Promise<void> {
@@ -96,6 +96,17 @@ export async function tick(): Promise<void> {
   for (const issue of candidates.slice(0, slots)) {
     if (issue.stateName === 'Rework' && reworkRunning >= config.maxReworkConcurrent) {
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'rework slots full')
+      continue
+    }
+
+    const dispatchCost = getCumulativeCost(issue.identifier)
+    if (dispatchCost >= config.maxCostPerIssueUsd) {
+      log.warn(
+        { issueId: issue.id, issueIdentifier: issue.identifier, cumulativeCost: dispatchCost, threshold: config.maxCostPerIssueUsd },
+        'cost guard tripped',
+      )
+      postComment(issue.id, `Cost guard: cumulative cost $${dispatchCost.toFixed(2)} exceeds $${config.maxCostPerIssueUsd} limit`).catch(() => {})
+      transitionToBlocked(issue.id).catch(() => {})
       continue
     }
 
@@ -267,6 +278,17 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
       } else {
         await escalateToHuman(issue, lock)
       }
+      continue
+    }
+
+    const reconcileCost = getCumulativeCost(issue.identifier)
+    if (reconcileCost >= config.maxCostPerIssueUsd) {
+      log.warn(
+        { issueId: issue.id, issueIdentifier: issue.identifier, cumulativeCost: reconcileCost, threshold: config.maxCostPerIssueUsd },
+        'cost guard tripped',
+      )
+      await postComment(issue.id, `Cost guard: cumulative cost $${reconcileCost.toFixed(2)} exceeds $${config.maxCostPerIssueUsd} limit`)
+      await transitionToBlocked(issue.id)
       continue
     }
 

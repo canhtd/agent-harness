@@ -12,7 +12,7 @@ const dest = new Writable({
 const logger = pino({ name: 'test' }, dest)
 
 vi.mock('./config.js', () => ({
-  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5, maxAttempts: 3, babysitCooldownMs: 600_000, babysitThreshold: 3 },
+  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5, maxAttempts: 3, babysitCooldownMs: 600_000, babysitThreshold: 3, maxCostPerIssueUsd: 50 },
   LOCKS: '/tmp/locks',
   WORKSPACES: '/tmp/workspaces',
   LOGS: '/tmp/logs',
@@ -93,6 +93,7 @@ vi.mock('./tokens.js', () => ({
   findSessionJsonl: vi.fn().mockReturnValue(null),
   aggregateTokens: vi.fn(),
   appendTokenRecord: vi.fn(),
+  getCumulativeCost: vi.fn().mockReturnValue(0),
 }))
 
 vi.mock('./handoff.js', () => ({
@@ -771,5 +772,105 @@ describe('review circuit breaker', () => {
     expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
       expect.objectContaining({ reviewFailCount: 0, reviewFailPrHead: undefined, reviewFailError: undefined }),
     )
+  })
+})
+
+describe('cost guard', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('blocks dispatch when cumulative cost exceeds threshold', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const runner = await import('./runner.js')
+    const tokens = await import('./tokens.js')
+
+    vi.mocked(runner.spawnAgent).mockClear()
+    vi.mocked(linear.postComment).mockResolvedValue(undefined as any)
+    vi.mocked(linear.transitionToBlocked).mockResolvedValue(undefined as any)
+
+    vi.mocked(linear.fetchCandidates).mockResolvedValue([
+      { id: 'issue-cg1', identifier: 'ENG-120', title: 'Expensive', description: '', priority: 2, labels: [], stateName: 'Todo' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue(null)
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(55.50)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnAgent)).not.toHaveBeenCalled()
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-cg1',
+      'Cost guard: cumulative cost $55.50 exceeds $50 limit',
+    )
+    expect(vi.mocked(linear.transitionToBlocked)).toHaveBeenCalledWith('issue-cg1')
+
+    const guardLine = logLines.find((l) => l.includes('cost guard tripped'))
+    expect(guardLine).toBeDefined()
+    const parsed = JSON.parse(guardLine!)
+    expect(parsed.issueIdentifier).toBe('ENG-120')
+    expect(parsed.cumulativeCost).toBe(55.50)
+  })
+
+  it('allows dispatch when cumulative cost is below threshold', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const runner = await import('./runner.js')
+    const workspace = await import('./workspace.js')
+    const tokens = await import('./tokens.js')
+
+    vi.mocked(linear.fetchCandidates).mockResolvedValue([
+      { id: 'issue-cg2', identifier: 'ENG-121', title: 'Cheap', description: '', priority: 2, labels: [], stateName: 'Todo' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue(null)
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(10.00)
+    vi.mocked(workspace.ensureWorktree).mockResolvedValue({ path: '/tmp/workspaces/ENG-121', created: false })
+    vi.mocked(runner.spawnAgent).mockResolvedValue(5555)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnAgent)).toHaveBeenCalled()
+
+    const guardLine = logLines.find((l) => l.includes('cost guard tripped'))
+    expect(guardLine).toBeUndefined()
+  })
+
+  it('blocks re-dispatch in reconcile when cost exceeds threshold', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const runner = await import('./runner.js')
+    const tokens = await import('./tokens.js')
+
+    vi.mocked(runner.spawnContinuation).mockClear()
+    vi.mocked(linear.postComment).mockResolvedValue(undefined as any)
+    vi.mocked(linear.transitionToBlocked).mockResolvedValue(undefined as any)
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-cg3', identifier: 'ENG-122', title: 'Expensive retry', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-cg3', identifier: 'ENG-122',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'CI failed' })
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(60.00)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnContinuation)).not.toHaveBeenCalled()
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-cg3',
+      'Cost guard: cumulative cost $60.00 exceeds $50 limit',
+    )
+    expect(vi.mocked(linear.transitionToBlocked)).toHaveBeenCalledWith('issue-cg3')
+
+    const guardLine = logLines.find((l) => l.includes('cost guard tripped'))
+    expect(guardLine).toBeDefined()
   })
 })
