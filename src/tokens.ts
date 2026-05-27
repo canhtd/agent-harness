@@ -7,12 +7,14 @@ export interface TokenRecord {
   task: string
   date: string
   model: string
-  turns: number
+  messages: number
   input_tokens: number
   output_tokens: number
   cache_creation_tokens: number
   cache_read_tokens: number
   estimated_cost_usd: number
+  duration_seconds: number
+  status: string
 }
 
 interface PricingTier {
@@ -63,7 +65,7 @@ export function aggregateTokens(jsonlPath: string, issueIdentifier: string): Tok
   let outputTokens = 0
   let cacheCreationTokens = 0
   let cacheReadTokens = 0
-  let turns = 0
+  let messages = 0
   let model = ''
 
   for (const line of lines) {
@@ -74,7 +76,7 @@ export function aggregateTokens(jsonlPath: string, issueIdentifier: string): Tok
     const usage = entry.message?.usage
     if (!usage) continue
 
-    turns++
+    messages++
     inputTokens += usage.input_tokens ?? 0
     outputTokens += usage.output_tokens ?? 0
     cacheCreationTokens += usage.cache_creation_input_tokens ?? 0
@@ -95,12 +97,14 @@ export function aggregateTokens(jsonlPath: string, issueIdentifier: string): Tok
     task: issueIdentifier,
     date: new Date().toISOString(),
     model: model || 'unknown',
-    turns,
+    messages,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     cache_creation_tokens: cacheCreationTokens,
     cache_read_tokens: cacheReadTokens,
     estimated_cost_usd: Math.round(cost * 1_000_000) / 1_000_000,
+    duration_seconds: 0,
+    status: 'unknown',
   }
 }
 
