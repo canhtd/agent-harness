@@ -49,10 +49,12 @@ export async function tick(): Promise<void> {
       if (jsonlPath) {
         const record = aggregateTokens(jsonlPath, agent.identifier)
         const lock = await readLock(agent.issueId)
-        if (lock?.startedAt) {
-          record.duration_seconds = Math.round((Date.now() - new Date(lock.startedAt).getTime()) / 1000)
+        if (lock) {
+          if (lock.startedAt) {
+            record.duration_seconds = Math.round((Date.now() - new Date(lock.startedAt).getTime()) / 1000)
+          }
+          record.status = lock.exitCode === 0 ? 'completed' : 'failed'
         }
-        record.status = lock?.exitCode === 0 ? 'completed' : 'failed'
         appendTokenRecord(record)
         log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier, cost: record.estimated_cost_usd }, 'token usage recorded')
       }
