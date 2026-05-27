@@ -280,9 +280,9 @@ async function writeBabysitState(pid: number): Promise<void> {
 
 function isStuck(lock: Awaited<ReturnType<typeof readLock>>): boolean {
   if (!lock || isAlive(lock.pid)) return false
-  if (lock.exitCode === undefined) return false
+  if (lock.exitCode === undefined || lock.exitCode === 0) return false
   if (lock.attempt >= config.babysitThreshold) return true
-  if (lock.exitCode !== 0 && lock.lastExitCode !== undefined && lock.lastExitCode === lock.exitCode) return true
+  if (lock.lastExitCode !== undefined && lock.lastExitCode === lock.exitCode) return true
   return false
 }
 

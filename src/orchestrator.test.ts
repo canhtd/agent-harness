@@ -479,6 +479,21 @@ describe('detectStuck', () => {
     expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
   })
 
+  it('does not spawn babysit for placeholder locks (pid=-1, exitCode=0)', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: -1, issueId: 'issue-p1', identifier: 'ENG-99', startedAt: '2025-01-01T00:00:00Z', attempt: 3, exitCode: 0 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
+  })
+
   it('does not spawn babysit when exitCode is undefined (cleanup not yet processed)', async () => {
     const lockfile = await import('./lockfile.js')
     const runner = await import('./runner.js')
