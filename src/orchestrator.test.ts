@@ -438,7 +438,7 @@ describe('detectStuck', () => {
     vi.mocked(lockfile.isAlive).mockReturnValue(false)
 
     const { detectStuck } = await import('./orchestrator.js')
-    await detectStuck()
+    const stuckIds = await detectStuck()
 
     expect(vi.mocked(runner.spawnBabysit)).toHaveBeenCalledWith(
       expect.stringContaining('ENG-90'),
@@ -447,6 +447,7 @@ describe('detectStuck', () => {
       '/tmp/babysit-last.json',
       expect.stringContaining('"pid":99999'),
     )
+    expect(stuckIds).toEqual(new Set(['issue-s1']))
   })
 
   it('does not spawn babysit when agent pid is alive', async () => {
@@ -605,5 +606,31 @@ describe('detectStuck', () => {
     await detectStuck()
 
     expect(vi.mocked(runner.spawnBabysit)).toHaveBeenCalled()
+  })
+
+  it('returns stuck issue IDs so reconcile can skip them', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+
+    vi.mocked(runner.spawnAgent).mockClear()
+    vi.mocked(runner.spawnContinuation).mockClear()
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-stuck', identifier: 'ENG-100', startedAt: '2025-01-01T00:00:00Z', attempt: 3, exitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-stuck', identifier: 'ENG-100', title: 'Stuck', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'redispatch', reason: 'CI failed' })
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnBabysit)).toHaveBeenCalled()
+    expect(vi.mocked(runner.spawnContinuation)).not.toHaveBeenCalled()
+    expect(vi.mocked(runner.spawnAgent)).not.toHaveBeenCalled()
   })
 })

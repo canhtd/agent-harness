@@ -91,7 +91,6 @@ export async function cleanup(): Promise<CompletedAgent[]> {
       const code = exitCode ?? 1
       const delay = computeBackoff(lock.attempt)
       lock.exitCode = code
-      lock.lastExitCode = code
       lock.notBefore = new Date(Date.now() + delay).toISOString()
       await writeLock(lock)
       log.info({
