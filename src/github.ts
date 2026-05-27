@@ -138,6 +138,17 @@ function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'n
   }
 }
 
+export function getPrHeadSha(prNumber: number): string | null {
+  try {
+    const raw = ghExec(
+      `gh pr view ${prNumber} --json headRefOid --jq '.headRefOid'`,
+    )
+    return raw || null
+  } catch {
+    return null
+  }
+}
+
 export function hasNewCommitsSinceReview(prNumber: number): boolean {
   try {
     const raw = ghExec(

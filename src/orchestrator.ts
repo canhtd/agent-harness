@@ -5,7 +5,7 @@ import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStat
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
 import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
 import type { IssueInfo } from './linear.js'
-import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody } from './github.js'
+import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody, getPrHeadSha } from './github.js'
 import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
@@ -176,16 +176,57 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
     }
 
     if (outcome.action === 'review') {
+      const currentHead = getPrHeadSha(outcome.prNumber)
+      const failCount = lock?.reviewFailCount ?? 0
+      const failHead = lock?.reviewFailPrHead
+
+      if (failCount > 0 && currentHead && failHead && currentHead !== failHead) {
+        if (lock) {
+          lock.reviewFailCount = 0
+          lock.reviewFailPrHead = undefined
+          lock.reviewFailError = undefined
+          await writeLock(lock)
+        }
+        log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review circuit breaker reset — new commits detected')
+      }
+
+      const effectiveFailCount = lock?.reviewFailCount ?? 0
+
+      if (effectiveFailCount >= 3) {
+        log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber, reviewFailCount: effectiveFailCount }, 'review circuit breaker tripped')
+        const lastError = lock?.reviewFailError ?? 'unknown error'
+        try {
+          await postComment(issue.id, `Review circuit breaker tripped after ${effectiveFailCount} consecutive failures. Last error: ${lastError}`)
+        } catch (err) {
+          log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post circuit breaker comment')
+        }
+        await transitionToBlocked(issue.id)
+        continue
+      }
+
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'triggering review')
       try {
         const review = await reviewPr(outcome.prNumber, issue.description ?? '')
+        if (lock && lock.reviewFailCount) {
+          lock.reviewFailCount = 0
+          lock.reviewFailPrHead = undefined
+          lock.reviewFailError = undefined
+          await writeLock(lock)
+        }
         if (review.approved) {
           log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review approved — awaiting merge')
         } else {
           log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review rejected — will re-dispatch')
         }
       } catch (err) {
-        log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'review failed')
+        const newFailCount = (lock?.reviewFailCount ?? 0) + 1
+        if (lock) {
+          lock.reviewFailCount = newFailCount
+          lock.reviewFailPrHead = currentHead ?? undefined
+          lock.reviewFailError = String(err)
+          await writeLock(lock)
+        }
+        log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err), reviewFailCount: newFailCount }, 'review failed')
       }
       continue
     }
