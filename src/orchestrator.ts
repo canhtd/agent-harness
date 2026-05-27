@@ -315,7 +315,7 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
       isFreshAttempt ? `re-dispatching fresh attempt ${attempt}/${config.maxAttempts}` : `turn ${turn} failed, dispatching turn ${nextTurn}`,
     )
 
-    if (!isFreshAttempt) {
+    if (turn > 0) {
       try {
         await postComment(issue.id, `**Turn ${turn} result**: ${outcome.reason}\n\nDispatching turn ${nextTurn} to fix.`)
       } catch (err) {
