@@ -14,7 +14,7 @@ function ghExec(cmd: string, opts?: { timeout?: number }): string {
 }
 
 export type PrOutcome =
-  | { action: 'done' }
+  | { action: 'done'; prNumber?: number }
   | { action: 'skip'; reason: string }
   | { action: 'redispatch'; reason: string }
   | { action: 'review'; prNumber: number }
@@ -36,7 +36,8 @@ export function checkPrStatus(identifier: string): PrOutcome {
   }
 
   if (prs.some((pr) => pr.state === 'MERGED')) {
-    return { action: 'done' }
+    const merged = prs.find((pr) => pr.state === 'MERGED')
+    return { action: 'done', prNumber: merged?.number }
   }
 
   const openPr = prs.find((pr) => pr.state === 'OPEN')
@@ -73,7 +74,7 @@ export function checkPrStatus(identifier: string): PrOutcome {
 
   if (reviewState === 'approved') {
     if (mergePr(openPr.number)) {
-      return { action: 'done' }
+      return { action: 'done', prNumber: openPr.number }
     }
     return { action: 'skip', reason: 'merge failed, will retry' }
   }

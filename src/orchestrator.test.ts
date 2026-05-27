@@ -360,7 +360,7 @@ describe('reconcile: post comment on redispatch', () => {
     expect(warnLine).toBeDefined()
   })
 
-  it('does not post comment on skip, done, or review', async () => {
+  it('posts comment on done and review approved, not on skip', async () => {
     const lockfile = await import('./lockfile.js')
     const linear = await import('./linear.js')
     const github = await import('./github.js')
@@ -380,7 +380,7 @@ describe('reconcile: post comment on redispatch', () => {
     let callCount = 0
     vi.mocked(github.checkPrStatus).mockImplementation(() => {
       callCount++
-      if (callCount === 1) return { action: 'done' }
+      if (callCount === 1) return { action: 'done', prNumber: 42 }
       if (callCount === 2) return { action: 'review', prNumber: 99 }
       return { action: 'skip', reason: 'waiting' }
     })
@@ -390,7 +390,10 @@ describe('reconcile: post comment on redispatch', () => {
     const { tick } = await import('./orchestrator.js')
     await tick()
 
-    expect(vi.mocked(linear.postComment)).not.toHaveBeenCalled()
+    const calls = vi.mocked(linear.postComment).mock.calls
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toEqual(['issue-c3', 'PR #42 merged — done'])
+    expect(calls[1]).toEqual(['issue-c4', 'Review approved (PR #99) — awaiting CI + merge'])
   })
 })
 
