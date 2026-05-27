@@ -90,15 +90,15 @@ export async function GET() {
   }
 
   const nodes = data.data?.issues.nodes ?? [];
-  const issues: IssueCard[] = nodes.map((n) => ({
-    id: n.id,
-    identifier: n.identifier,
-    title: n.title,
-    priority: n.priority,
-    url: n.url,
-    status: n.state.name,
-    column: COLUMN_MAP[n.state.type] ?? "todo",
-    createdAt: n.createdAt,
+  const issues: IssueCard[] = nodes.map((node) => ({
+    id: node.id,
+    identifier: node.identifier,
+    title: node.title,
+    priority: node.priority,
+    url: node.url,
+    status: node.state.name,
+    column: COLUMN_MAP[node.state.type] ?? "todo",
+    createdAt: node.createdAt,
   }));
 
   return NextResponse.json({ issues });
