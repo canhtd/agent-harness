@@ -55,7 +55,11 @@ export function checkPrStatus(identifier: string): PrOutcome {
     c.state === 'FAILURE' || c.state === 'ERROR',
   )
   if (hasFailure) {
-    return { action: 'redispatch', reason: 'CI checks failed' }
+    const details = fetchFailedCheckLogs(openPr.number)
+    const reason = details
+      ? `CI checks failed:\n${details}`
+      : 'CI checks failed'
+    return { action: 'redispatch', reason }
   }
 
   const hasPending = checks.some((c) =>
@@ -124,6 +128,34 @@ export function deleteRemoteBranch(identifier: string): void {
   try {
     ghExec(`git push origin --delete "${branch}"`)
   } catch {}
+}
+
+function fetchFailedCheckLogs(prNumber: number): string {
+  let failedChecks: Array<{ name: string; link: string; bucket: string }>
+  try {
+    const raw = ghExec(
+      `gh pr checks ${prNumber} --json name,link,bucket`,
+      { timeout: 15_000 },
+    )
+    const all = JSON.parse(raw) as Array<{ name: string; link: string; bucket: string }>
+    failedChecks = all.filter((c) => c.bucket === 'fail')
+  } catch {
+    return ''
+  }
+
+  let details = ''
+  for (const check of failedChecks) {
+    const runIdMatch = check.link.match(/\/runs\/(\d+)/)
+    if (!runIdMatch) continue
+    try {
+      const logOutput = ghExec(
+        `gh run view ${runIdMatch[1]} --log-failed`,
+        { timeout: 15_000 },
+      )
+      details += `\n### ${check.name}\n\`\`\`\n${logOutput.slice(-2000)}\n\`\`\``
+    } catch {}
+  }
+  return details
 }
 
 function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'none' {
