@@ -12,7 +12,7 @@ const dest = new Writable({
 const logger = pino({ name: 'test' }, dest)
 
 vi.mock('./config.js', () => ({
-  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5, maxAttempts: 3, babysitCooldownMs: 600_000, babysitThreshold: 3, maxCostPerIssueUsd: 50 },
+  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5, maxAttempts: 3, babysitCooldownMs: 600_000, babysitThreshold: 3, maxCostPerIssueUsd: 50, researchLabels: ['research', 'prd', 'design'] },
   LOCKS: '/tmp/locks',
   WORKSPACES: '/tmp/workspaces',
   LOGS: '/tmp/logs',
@@ -49,6 +49,7 @@ vi.mock('./workspace.js', () => ({
   ensureWorktree: vi.fn(),
   removeWorktree: vi.fn(),
   workspacePath: vi.fn((id: string) => `/tmp/workspaces/${id}`),
+  sanitize: vi.fn((s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_')),
 }))
 
 vi.mock('./linear.js', () => ({
@@ -57,6 +58,7 @@ vi.mock('./linear.js', () => ({
   fetchIssueState: vi.fn(),
   fetchIssueStateByIdentifier: vi.fn(),
   transitionToDone: vi.fn(),
+  transitionToInProgress: vi.fn().mockResolvedValue(undefined),
   transitionToBlocked: vi.fn().mockResolvedValue(undefined),
   postComment: vi.fn().mockResolvedValue(undefined),
 }))
@@ -65,6 +67,7 @@ vi.mock('./runner.js', () => ({
   spawnAgent: vi.fn(),
   spawnContinuation: vi.fn(),
   spawnBabysit: vi.fn().mockReturnValue(99999),
+  spawnResearchAgent: vi.fn().mockReturnValue(55555),
 }))
 
 vi.mock('./github.js', () => ({
@@ -876,5 +879,251 @@ describe('cost guard', () => {
 
     const guardLine = logLines.find((l) => l.includes('cost guard tripped'))
     expect(guardLine).toBeDefined()
+  })
+})
+
+describe('research label routing', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('dispatches research issue without worktree', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const runner = await import('./runner.js')
+    const workspace = await import('./workspace.js')
+    const tokens = await import('./tokens.js')
+
+    vi.mocked(runner.spawnAgent).mockClear()
+    vi.mocked(workspace.ensureWorktree).mockClear()
+    vi.mocked(linear.postComment).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([])
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(0)
+
+    vi.mocked(linear.fetchCandidates).mockResolvedValue([
+      { id: 'issue-r1', identifier: 'ENG-200', title: 'Research task', description: 'Investigate X', priority: 2, labels: ['research'], stateName: 'Todo' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue(null)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnResearchAgent)).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'issue-r1', identifier: 'ENG-200' }),
+    )
+    expect(vi.mocked(workspace.ensureWorktree)).not.toHaveBeenCalled()
+    expect(vi.mocked(runner.spawnAgent)).not.toHaveBeenCalled()
+    expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
+      expect.objectContaining({ stateName: 'research', issueId: 'issue-r1' }),
+    )
+
+    const researchLine = logLines.find((l) => l.includes('research agent spawned'))
+    expect(researchLine).toBeDefined()
+  })
+
+  it('dispatches prd label as research', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const runner = await import('./runner.js')
+    const tokens = await import('./tokens.js')
+
+    vi.mocked(runner.spawnResearchAgent).mockClear()
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(0)
+
+    vi.mocked(linear.fetchCandidates).mockResolvedValue([
+      { id: 'issue-r2', identifier: 'ENG-201', title: 'PRD task', description: '', priority: 2, labels: ['prd'], stateName: 'Todo' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue(null)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnResearchAgent)).toHaveBeenCalled()
+  })
+
+  it('dispatches normal issue with worktree when no research label', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const runner = await import('./runner.js')
+    const workspace = await import('./workspace.js')
+    const tokens = await import('./tokens.js')
+
+    vi.mocked(runner.spawnResearchAgent).mockClear()
+    vi.mocked(runner.spawnAgent).mockClear().mockResolvedValue(7777)
+    vi.mocked(workspace.ensureWorktree).mockResolvedValue({ path: '/tmp/workspaces/ENG-202', created: false })
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(0)
+
+    vi.mocked(linear.fetchCandidates).mockResolvedValue([
+      { id: 'issue-r3', identifier: 'ENG-202', title: 'Normal task', description: '', priority: 2, labels: ['feature'], stateName: 'Todo' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue(null)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(runner.spawnResearchAgent)).not.toHaveBeenCalled()
+    expect(vi.mocked(workspace.ensureWorktree)).toHaveBeenCalledWith('ENG-202')
+    expect(vi.mocked(runner.spawnAgent)).toHaveBeenCalled()
+  })
+
+  it('skips research issues in reconcile', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+
+    vi.mocked(github.checkPrStatus).mockClear()
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-r4', identifier: 'ENG-203', title: 'Research in progress', description: '', priority: 2, labels: ['research'], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-r4', identifier: 'ENG-203',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 1, exitCode: 0,
+      stateName: 'research',
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(github.checkPrStatus)).not.toHaveBeenCalled()
+  })
+})
+
+describe('research completion', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('posts agent output as comment and transitions to Done', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const tokens = await import('./tokens.js')
+    const { mkdirSync, writeFileSync, unlinkSync } = await import('node:fs')
+
+    mkdirSync('/tmp/logs', { recursive: true })
+    const logContent = [
+      JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: '## Research Findings\n\nHere are the results.' }] } }),
+    ].join('\n')
+    writeFileSync('/tmp/logs/ENG-210.log', logContent)
+
+    vi.mocked(lockfile.cleanup).mockResolvedValue([
+      { issueId: 'issue-rc1', identifier: 'ENG-210' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-rc1', identifier: 'ENG-210',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 1,
+      stateName: 'research', exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(linear.postComment).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(linear.transitionToDone).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(lockfile.removeLock).mockClear()
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(0)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-rc1',
+      '## Research Findings\n\nHere are the results.',
+    )
+    expect(vi.mocked(linear.transitionToDone)).toHaveBeenCalledWith('issue-rc1')
+    expect(vi.mocked(lockfile.removeLock)).toHaveBeenCalledWith('issue-rc1')
+
+    const doneLine = logLines.find((l) => l.includes('research issue done'))
+    expect(doneLine).toBeDefined()
+
+    try { unlinkSync('/tmp/logs/ENG-210.log') } catch {}
+  })
+
+  it('does not post comment when agent output is empty', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const tokens = await import('./tokens.js')
+    const { mkdirSync, writeFileSync, unlinkSync } = await import('node:fs')
+
+    mkdirSync('/tmp/logs', { recursive: true })
+    writeFileSync('/tmp/logs/ENG-211.log', '')
+
+    vi.mocked(lockfile.cleanup).mockResolvedValue([
+      { issueId: 'issue-rc2', identifier: 'ENG-211' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-rc2', identifier: 'ENG-211',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 1,
+      stateName: 'research', exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(linear.postComment).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(linear.transitionToDone).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(0)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.postComment)).not.toHaveBeenCalled()
+    expect(vi.mocked(linear.transitionToDone)).toHaveBeenCalledWith('issue-rc2')
+
+    try { unlinkSync('/tmp/logs/ENG-211.log') } catch {}
+  })
+
+  it('does not handle completion for non-research agents', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const tokens = await import('./tokens.js')
+
+    vi.mocked(lockfile.cleanup).mockResolvedValue([
+      { issueId: 'issue-rc3', identifier: 'ENG-212' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-rc3', identifier: 'ENG-212',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 1,
+      stateName: 'Todo', exitCode: 0,
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(linear.transitionToDone).mockClear()
+    vi.mocked(lockfile.removeLock).mockClear()
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'skip', reason: 'waiting' })
+    vi.mocked(tokens.getCumulativeCost).mockReturnValue(0)
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.transitionToDone)).not.toHaveBeenCalled()
+
+    const doneLine = logLines.find((l) => l.includes('research issue done'))
+    expect(doneLine).toBeUndefined()
+  })
+})
+
+describe('extractAgentOutput', () => {
+  it('extracts text from stream-json lines', async () => {
+    const { extractAgentOutput } = await import('./orchestrator.js')
+    const os = await import('node:os')
+    const path = await import('node:path')
+    const { writeFileSync, unlinkSync } = await import('node:fs')
+
+    const tmpFile = path.join(os.tmpdir(), `test-extract-${Date.now()}.log`)
+    writeFileSync(tmpFile, [
+      JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Finding 1' }] } }),
+      JSON.stringify({ type: 'tool_use', message: { content: [] } }),
+      JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Finding 2' }] } }),
+    ].join('\n'))
+
+    const result = extractAgentOutput(tmpFile)
+    expect(result).toBe('Finding 1\n\nFinding 2')
+
+    unlinkSync(tmpFile)
+  })
+
+  it('returns empty string for missing file', async () => {
+    const { extractAgentOutput } = await import('./orchestrator.js')
+
+    const result = extractAgentOutput('/tmp/definitely-missing-file-12345.log')
+    expect(result).toBe('')
   })
 })

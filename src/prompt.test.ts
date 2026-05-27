@@ -68,6 +68,27 @@ describe('prompt routing', () => {
   })
 })
 
+describe('research prompt', () => {
+  it('builds research prompt with correct structure', async () => {
+    const { buildResearchPrompt } = await import('./prompt.js')
+    const issue = makeIssue({ labels: ['research'] })
+    const prompt = buildResearchPrompt(issue)
+    expect(prompt).toContain('RESEARCH')
+    expect(prompt).toContain('Do NOT create files, branches, or PRs')
+    expect(prompt).toContain('Do NOT modify any code')
+    expect(prompt).toContain('posted as a comment on the Linear issue')
+    expect(prompt).toContain(issue.identifier)
+    expect(prompt).toContain(issue.title)
+  })
+
+  it('includes issue labels', async () => {
+    const { buildResearchPrompt } = await import('./prompt.js')
+    const issue = makeIssue({ labels: ['research', 'prd'] })
+    const prompt = buildResearchPrompt(issue)
+    expect(prompt).toContain('Labels: research, prd')
+  })
+})
+
 describe('handoff injection', () => {
   it('appends handoff content when attempt > 1 and handoff exists', async () => {
     const handoff = await import('./handoff.js')

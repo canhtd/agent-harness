@@ -26,11 +26,12 @@ vi.mock('./workspace.js', () => ({
 vi.mock('./prompt.js', () => ({
   buildPrompt: vi.fn().mockResolvedValue('test prompt'),
   buildContinuationPrompt: vi.fn().mockReturnValue('continuation prompt'),
+  buildResearchPrompt: vi.fn().mockReturnValue('research prompt'),
 }))
 
 vi.mock('./linear.js', () => ({}))
 
-import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
+import { spawnAgent, spawnContinuation, spawnBabysit, spawnResearchAgent } from './runner.js'
 import type { IssueInfo } from './linear.js'
 
 const fakeIssue: IssueInfo = {
@@ -90,6 +91,42 @@ describe('spawnBabysit', () => {
 
   it('does not use --continue flag', () => {
     spawnBabysit('context')
+    const shCommand = mockSpawn.mock.calls[0][1][1]
+    expect(shCommand).not.toContain('--continue')
+  })
+})
+
+describe('spawnResearchAgent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('spawns in repo root, not a worktree', () => {
+    spawnResearchAgent(fakeIssue)
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'sh',
+      expect.arrayContaining(['-c']),
+      expect.objectContaining({ cwd: '/tmp/repo' }),
+    )
+  })
+
+  it('opens log in write mode', () => {
+    spawnResearchAgent(fakeIssue)
+    expect(mockOpenSync).toHaveBeenCalledWith(
+      expect.stringContaining('ENG-99.log'),
+      'w',
+    )
+  })
+
+  it('uses --verbose and --output-format stream-json', () => {
+    spawnResearchAgent(fakeIssue)
+    const shCommand = mockSpawn.mock.calls[0][1][1]
+    expect(shCommand).toContain('--verbose')
+    expect(shCommand).toContain('--output-format stream-json')
+  })
+
+  it('does not use --continue flag', () => {
+    spawnResearchAgent(fakeIssue)
     const shCommand = mockSpawn.mock.calls[0][1][1]
     expect(shCommand).not.toContain('--continue')
   })

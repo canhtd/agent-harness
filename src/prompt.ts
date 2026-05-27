@@ -93,6 +93,24 @@ function reworkPrompt(issue: IssueInfo): string {
   ].join('\n')
 }
 
+export function buildResearchPrompt(issue: IssueInfo): string {
+  return [
+    `Linear issue: ${issue.identifier} — ${issue.title} (RESEARCH)`,
+    '',
+    issue.description || '(no description)',
+    '',
+    `Labels: ${issue.labels.join(', ')}`,
+    '',
+    'You are a research agent. Read the issue description and produce a thorough analysis.',
+    'Output your findings as structured markdown.',
+    'Do NOT create files, branches, or PRs.',
+    'Do NOT modify any code.',
+    'Your output will be posted as a comment on the Linear issue.',
+    '',
+    'You are running autonomously — do not ask for confirmation.',
+  ].join('\n')
+}
+
 export function buildContinuationPrompt(issue: IssueInfo, reason: string): string {
   const hasReviewFeedback = reason.startsWith('review requested changes')
 
