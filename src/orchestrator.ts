@@ -89,9 +89,10 @@ export async function tick(): Promise<void> {
           log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research completed')
         } catch (err) {
           log.error({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'research completion failed')
+          await removeLock(agent.issueId).catch(() => {})
         }
       } else {
-        await removeLock(agent.issueId)
+        await removeLock(agent.issueId).catch(() => {})
         log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, exitCode: lock.exitCode }, 'research agent failed')
       }
       continue
