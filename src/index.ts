@@ -6,12 +6,14 @@ import { tick } from './orchestrator.js'
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '30000') // 30s default
 const ONCE = process.argv.includes('--once')
 
-function mainHasChanged(): boolean {
+function pullMainIfChanged(): boolean {
   try {
     execSync('git fetch origin main', { cwd: config.repoPath, stdio: 'pipe', timeout: 15_000 })
     const local = execSync('git rev-parse main', { cwd: config.repoPath, stdio: 'pipe' }).toString().trim()
     const remote = execSync('git rev-parse origin/main', { cwd: config.repoPath, stdio: 'pipe' }).toString().trim()
-    return local !== remote
+    if (local === remote) return false
+    execSync('git merge --ff-only origin/main', { cwd: config.repoPath, stdio: 'pipe', timeout: 15_000 })
+    return true
   } catch {
     return false
   }
@@ -24,7 +26,7 @@ async function run() {
   log.info({ intervalMs: POLL_INTERVAL_MS }, 'polling mode — next tick scheduled')
   setInterval(async () => {
     try {
-      if (mainHasChanged()) {
+      if (pullMainIfChanged()) {
         log.info('main branch updated — exiting for restart')
         process.exit(0)
       }

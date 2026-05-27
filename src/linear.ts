@@ -97,6 +97,17 @@ export async function fetchInProgressIssues(): Promise<IssueInfo[]> {
   return issues
 }
 
+export async function transitionToInProgress(issueId: string): Promise<void> {
+  const linear = createClient()
+  const teams = await linear.teams({ filter: { key: { eq: config.teamKey } }, first: 1 })
+  const team = teams.nodes[0]
+  if (!team) return
+  const states = await team.states()
+  const state = states.nodes.find((s) => s.name === 'In Progress')
+  if (!state) return
+  await linear.updateIssue(issueId, { stateId: state.id })
+}
+
 export async function transitionToDone(issueId: string): Promise<void> {
   const linear = createClient()
   const teams = await linear.teams({ filter: { key: { eq: config.teamKey } }, first: 1 })

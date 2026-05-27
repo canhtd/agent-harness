@@ -80,6 +80,10 @@ Khi agent bị kill giữa chừng `git rebase`, worktree giữ lại `rebase-me
 
 `claude -p --output-format stream-json` crash với "requires --verbose". Phải luôn kèm `--verbose` flag. ENG-32 merge thiếu flag này → tất cả agent crash. Smoke test (`runner.smoke.test.ts`) sẽ bắt lỗi này — chạy `claude -p` thật với đúng flags trước commit.
 
+## mainHasChanged phải pull trước khi exit
+
+`src/index.ts` detect `origin/main` khác local main → exit để systemd restart. Nhưng nếu không `git merge --ff-only origin/main` trước khi exit, restart sẽ chạy code cũ → detect khác → exit lại → loop vô hạn. Đã xảy ra 367 lần restart liên tiếp mà không bao giờ chạy code mới. Function phải pull trước, exit sau.
+
 ## Không code tay — tạo issue để agent tự build
 
 Agent harness tự build chính nó (bootstrapping). Mọi feature/fix phải tạo Linear issue → orchestrator dispatch agent → agent implement. Không code tay rồi push trực tiếp. Chỉ code tay khi agent không thể tự làm (ví dụ: fix orchestrator đang broken không dispatch được).
