@@ -52,10 +52,17 @@ CI gates trước merge + AI review.
 ### Phase 3.5: Operational Robustness ⚠️
 Hệ thống tự vận hành ổn định.
 
-- [ ] Auto-restart orchestrator sau khi main thay đổi
+- [x] Auto-restart orchestrator sau khi main thay đổi (detect main updated → exit → systemd restart)
 - [ ] Merge queue (GitHub merge queue) — rebase + re-run CI trước merge
-- [ ] Process manager (pm2/launchd) — auto-restart nếu crash
+- [x] Process manager: launchd trên Mac (ENG-27), systemd trên Ubuntu
 - [x] Full pipeline test: ENG-14 dispatch → code + test → PR → review → merge ✅
+- [x] Stall detection fix — stream-json output + 600s timeout (ENG-32)
+- [x] gh CLI auth fix cho agent env (ENG-33)
+- [x] Turn comment label fix (ENG-34)
+- [ ] Delete remote branch khi close PR fresh attempt (ENG-35)
+- [ ] Smoke test cho CLI spawn flags (ENG-36)
+- [ ] Babysit skill — orchestrator spawn recovery agent khi stuck (ENG-37)
+- [x] Multi-machine support: Mac + Ubuntu chạy cùng codebase
 
 ### Phase 4: Grader + Bridge (deferred)
 Khi muốn fully autonomous deploy hoặc quality drift detection.
@@ -95,4 +102,5 @@ Key patterns:
 - Dispatch nhiều agents cùng lúc sửa cùng file → merge conflict → cần sequential dispatch hoặc reconciliation re-dispatch
 - Agent code từ main cũ → conflict khi merge → reconciliation loop auto-detect + re-dispatch
 - `claude -p` one-shot nhưng `--continue` cho multi-turn
-- Orchestrator code thay đổi cần restart (`pkill + pnpm start`)
+- Orchestrator detect main updated → tự exit → systemd/launchd restart tự động
+- `claude -p --output-format stream-json` cần `--verbose` flag kèm theo

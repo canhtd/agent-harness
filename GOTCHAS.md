@@ -76,6 +76,10 @@ Khi close PR và reset worktree, phải xóa cả remote branch (`git push origi
 
 Khi agent bị kill giữa chừng `git rebase`, worktree giữ lại `rebase-merge` directory. Hook `before_run` chạy `git rebase origin/main` fail mãi với "It seems that there is already a rebase-merge directory". Fix: `rm -rf .git/worktrees/{IDENTIFIER}/rebase-merge` hoặc xóa worktree rồi tạo lại.
 
+## --output-format stream-json cần --verbose
+
+`claude -p --output-format stream-json` crash với "requires --verbose". Phải luôn kèm `--verbose` flag. ENG-32 merge thiếu flag này → tất cả agent crash. Smoke test (`runner.smoke.test.ts`) sẽ bắt lỗi này — chạy `claude -p` thật với đúng flags trước commit.
+
 ## Không code tay — tạo issue để agent tự build
 
 Agent harness tự build chính nó (bootstrapping). Mọi feature/fix phải tạo Linear issue → orchestrator dispatch agent → agent implement. Không code tay rồi push trực tiếp. Chỉ code tay khi agent không thể tự làm (ví dụ: fix orchestrator đang broken không dispatch được).
