@@ -82,8 +82,9 @@ export async function GET() {
     }
     data = await res.json();
   } catch (err) {
+    console.error("Linear API fetch failed:", err);
     return NextResponse.json(
-      { error: String(err), issues: [] },
+      { error: "Failed to reach Linear API", issues: [] },
       { status: 502 },
     );
   }
