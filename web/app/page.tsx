@@ -32,6 +32,7 @@ function relativeTime(iso: string): string {
 export default function DashboardPage() {
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stale, setStale] = useState(false);
 
   const fetchData = useCallback(() => {
     fetch("/api/health")
@@ -39,8 +40,11 @@ export default function DashboardPage() {
         if (!r.ok) throw new Error("fetch failed");
         return r.json();
       })
-      .then((d: HealthData) => setData(d))
-      .catch(() => {})
+      .then((d: HealthData) => {
+        setData(d);
+        setStale(false);
+      })
+      .catch(() => setStale(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -68,6 +72,11 @@ export default function DashboardPage() {
 
   return (
     <main className="page">
+      {stale && (
+        <div className="kanban-error" style={{ marginBottom: "1rem" }}>
+          Auto-refresh failed — data may be stale
+        </div>
+      )}
       <div className="cards-grid">
         <div className="card">
           <span className="card-label">Running agents</span>

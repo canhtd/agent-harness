@@ -53,6 +53,7 @@ export async function GET() {
   const tokensPath =
     process.env.TOKENS_LOG_PATH ||
     join(homedir(), ".agent-harness", "logs", "tokens.jsonl");
+  const maxAttempts = Number(process.env.MAX_ATTEMPTS) || 3;
 
   const sessions: SessionInfo[] = [];
   let running = 0;
@@ -76,7 +77,10 @@ export async function GET() {
           alive,
         });
         if (alive) running++;
-        else if (lock.exitCode != null && lock.exitCode !== 0) blocked++;
+        else if (
+          (lock.exitCode != null && lock.exitCode !== 0) ||
+          lock.attempt >= maxAttempts
+        ) blocked++;
       } catch {
         // skip malformed lock files
       }
