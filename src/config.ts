@@ -15,6 +15,7 @@ export const config = {
   maxAttempts: Number(process.env.MAX_ATTEMPTS) || 3,
   babysitCooldownMs: Number(process.env.BABYSIT_COOLDOWN_MS) || 600_000,
   babysitThreshold: Number(process.env.BABYSIT_THRESHOLD) || 3,
+  maxCostPerIssueUsd: Number(process.env.MAX_COST_PER_ISSUE_USD) || 50,
 }
 
 const BASE = path.join(os.homedir(), '.agent-harness')

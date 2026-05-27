@@ -9,7 +9,7 @@ import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastR
 import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
-import { findSessionJsonl, aggregateTokens, appendTokenRecord } from './tokens.js'
+import { findSessionJsonl, aggregateTokens, appendTokenRecord, getCumulativeCost } from './tokens.js'
 import { writeHandoff, removeHandoff } from './handoff.js'
 
 export async function tick(): Promise<void> {
@@ -101,6 +101,14 @@ export async function tick(): Promise<void> {
   let reworkRunning = await countRunningByState('Rework')
 
   for (const issue of candidates.slice(0, slots)) {
+    const cumulativeCost = getCumulativeCost(issue.identifier)
+    if (cumulativeCost >= config.maxCostPerIssueUsd) {
+      log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, cumulativeCost }, 'cost guard tripped')
+      postComment(issue.id, `Cost guard: cumulative cost $${cumulativeCost.toFixed(2)} exceeds $${config.maxCostPerIssueUsd} limit`).catch(() => {})
+      transitionToBlocked(issue.id).catch(() => {})
+      continue
+    }
+
     if (issue.stateName === 'Rework' && reworkRunning >= config.maxReworkConcurrent) {
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'rework slots full')
       continue
@@ -251,6 +259,14 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
 
     if (outcome.action === 'skip') {
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, reason: outcome.reason }, 'skipping')
+      continue
+    }
+
+    const cumulativeCost = getCumulativeCost(issue.identifier)
+    if (cumulativeCost >= config.maxCostPerIssueUsd) {
+      log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, cumulativeCost }, 'cost guard tripped')
+      postComment(issue.id, `Cost guard: cumulative cost $${cumulativeCost.toFixed(2)} exceeds $${config.maxCostPerIssueUsd} limit`).catch(() => {})
+      transitionToBlocked(issue.id).catch(() => {})
       continue
     }
 

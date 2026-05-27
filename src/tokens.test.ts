@@ -7,7 +7,7 @@ vi.mock('./config.js', () => ({
   TOKENS_LOG: '/tmp/test-tokens/tokens.jsonl',
 }))
 
-import { findSessionJsonl, aggregateTokens, appendTokenRecord, type TokenRecord } from './tokens.js'
+import { findSessionJsonl, aggregateTokens, appendTokenRecord, getCumulativeCost, type TokenRecord } from './tokens.js'
 
 function buildAssistantLine(model: string, usage: Record<string, number>): string {
   return JSON.stringify({
@@ -237,5 +237,48 @@ describe('appendTokenRecord', () => {
     expect(lines).toHaveLength(2)
     expect(JSON.parse(lines[0]).task).toBe('ENG-1')
     expect(JSON.parse(lines[1]).task).toBe('ENG-2')
+  })
+})
+
+describe('getCumulativeCost', () => {
+  const tokensPath = '/tmp/test-tokens/tokens.jsonl'
+
+  beforeEach(() => {
+    try { fs.rmSync('/tmp/test-tokens', { recursive: true }) } catch {}
+  })
+
+  afterEach(() => {
+    try { fs.rmSync('/tmp/test-tokens', { recursive: true }) } catch {}
+  })
+
+  it('returns 0 when tokens.jsonl does not exist', () => {
+    expect(getCumulativeCost('ENG-99')).toBe(0)
+  })
+
+  it('sums cost for matching issue identifier', () => {
+    fs.mkdirSync('/tmp/test-tokens', { recursive: true })
+    const lines = [
+      JSON.stringify({ task: 'ENG-10', estimated_cost_usd: 12.50 }),
+      JSON.stringify({ task: 'ENG-10', estimated_cost_usd: 8.25 }),
+      JSON.stringify({ task: 'ENG-11', estimated_cost_usd: 5.00 }),
+    ].join('\n')
+    fs.writeFileSync(tokensPath, lines)
+
+    expect(getCumulativeCost('ENG-10')).toBe(20.75)
+    expect(getCumulativeCost('ENG-11')).toBe(5.00)
+    expect(getCumulativeCost('ENG-99')).toBe(0)
+  })
+
+  it('skips malformed lines', () => {
+    fs.mkdirSync('/tmp/test-tokens', { recursive: true })
+    const lines = [
+      JSON.stringify({ task: 'ENG-10', estimated_cost_usd: 10.00 }),
+      'not json',
+      '',
+      JSON.stringify({ task: 'ENG-10', estimated_cost_usd: 5.00 }),
+    ].join('\n')
+    fs.writeFileSync(tokensPath, lines)
+
+    expect(getCumulativeCost('ENG-10')).toBe(15.00)
   })
 })

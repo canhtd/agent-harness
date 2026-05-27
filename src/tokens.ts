@@ -108,6 +108,27 @@ export function aggregateTokens(jsonlPath: string, issueIdentifier: string): Tok
   }
 }
 
+export function getCumulativeCost(issueIdentifier: string): number {
+  if (!fs.existsSync(TOKENS_LOG)) return 0
+
+  const content = fs.readFileSync(TOKENS_LOG, 'utf-8')
+  let total = 0
+
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const record = JSON.parse(line) as TokenRecord
+      if (record.task === issueIdentifier) {
+        total += record.estimated_cost_usd ?? 0
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return Math.round(total * 100) / 100
+}
+
 export function appendTokenRecord(record: TokenRecord): void {
   const dir = path.dirname(TOKENS_LOG)
   fs.mkdirSync(dir, { recursive: true })
