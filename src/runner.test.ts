@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockOpenSync = vi.fn().mockReturnValue(3)
+const mockReadFileSync = vi.fn().mockReturnValue('# Babysit skill content')
 const mockSpawn = vi.fn().mockReturnValue({ unref: vi.fn(), pid: 12345 })
 
 vi.mock('node:fs', () => ({
   openSync: (...args: unknown[]) => mockOpenSync(...args),
+  readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
 }))
 
 vi.mock('node:child_process', () => ({
@@ -28,7 +30,7 @@ vi.mock('./prompt.js', () => ({
 
 vi.mock('./linear.js', () => ({}))
 
-import { spawnAgent, spawnContinuation } from './runner.js'
+import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
 import type { IssueInfo } from './linear.js'
 
 const fakeIssue: IssueInfo = {
@@ -60,5 +62,35 @@ describe('runner log file modes', () => {
       expect.stringContaining('ENG-99.log'),
       'a',
     )
+  })
+})
+
+describe('spawnBabysit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reads skill file and spawns in repo root', () => {
+    const pid = spawnBabysit('Issue ENG-1: stuck')
+    expect(pid).toBe(12345)
+    expect(mockReadFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('babysit/SKILL.md'),
+      'utf-8',
+    )
+    expect(mockOpenSync).toHaveBeenCalledWith(
+      expect.stringContaining('babysit.log'),
+      'w',
+    )
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'sh',
+      expect.arrayContaining(['-c']),
+      expect.objectContaining({ cwd: '/tmp/repo' }),
+    )
+  })
+
+  it('does not use --continue flag', () => {
+    spawnBabysit('context')
+    const shCommand = mockSpawn.mock.calls[0][1][1]
+    expect(shCommand).not.toContain('--continue')
   })
 })

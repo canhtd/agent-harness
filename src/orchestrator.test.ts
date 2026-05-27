@@ -12,16 +12,24 @@ const dest = new Writable({
 const logger = pino({ name: 'test' }, dest)
 
 vi.mock('./config.js', () => ({
-  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5, maxAttempts: 3 },
+  config: { repoPath: '/tmp', maxConcurrent: 10, maxReworkConcurrent: 2, stallTimeoutMs: 180000, maxTurns: 5, maxAttempts: 3, babysitCooldownMs: 600_000, babysitThreshold: 3 },
   LOCKS: '/tmp/locks',
   WORKSPACES: '/tmp/workspaces',
   LOGS: '/tmp/logs',
   HANDOFFS: '/tmp/handoffs',
+  BABYSIT_STATE: '/tmp/babysit-last.json',
   log: logger,
 }))
 
+const mockFsReadFile = vi.fn().mockRejectedValue(new Error('ENOENT'))
+const mockFsWriteFile = vi.fn().mockResolvedValue(undefined)
+
 vi.mock('node:fs/promises', () => ({
-  default: { mkdir: vi.fn().mockResolvedValue(undefined) },
+  default: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    readFile: (...args: unknown[]) => mockFsReadFile(...args),
+    writeFile: (...args: unknown[]) => mockFsWriteFile(...args),
+  },
 }))
 
 vi.mock('./lockfile.js', () => ({
@@ -56,6 +64,7 @@ vi.mock('./linear.js', () => ({
 vi.mock('./runner.js', () => ({
   spawnAgent: vi.fn(),
   spawnContinuation: vi.fn(),
+  spawnBabysit: vi.fn().mockReturnValue(99999),
 }))
 
 vi.mock('./github.js', () => ({
@@ -406,5 +415,133 @@ describe('reconcileTerminal: handoff cleanup', () => {
     await tick()
 
     expect(vi.mocked(handoff.removeHandoff)).toHaveBeenCalledWith('ENG-70')
+  })
+})
+
+describe('detectStuck', () => {
+  beforeEach(async () => {
+    logLines.length = 0
+    vi.resetModules()
+    mockFsReadFile.mockRejectedValue(new Error('ENOENT'))
+    mockFsWriteFile.mockResolvedValue(undefined)
+    const runner = await import('./runner.js')
+    vi.mocked(runner.spawnBabysit).mockClear()
+  })
+
+  it('spawns babysit when agent exceeds threshold attempts and pid is dead', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s1', identifier: 'ENG-90', startedAt: '2025-01-01T00:00:00Z', attempt: 3, exitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).toHaveBeenCalledWith(
+      expect.stringContaining('ENG-90'),
+    )
+    expect(mockFsWriteFile).toHaveBeenCalledWith(
+      '/tmp/babysit-last.json',
+      expect.stringContaining('"pid":99999'),
+    )
+  })
+
+  it('does not spawn babysit when agent pid is alive', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s2', identifier: 'ENG-91', startedAt: '2025-01-01T00:00:00Z', attempt: 5, exitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(true)
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
+  })
+
+  it('does not spawn babysit when attempts below threshold', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s3', identifier: 'ENG-92', startedAt: '2025-01-01T00:00:00Z', attempt: 2, exitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
+  })
+
+  it('throttles babysit within cooldown window', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s4', identifier: 'ENG-93', startedAt: '2025-01-01T00:00:00Z', attempt: 5, exitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    mockFsReadFile.mockResolvedValue(JSON.stringify({
+      lastSpawnedAt: new Date().toISOString(),
+      pid: 88888,
+    }))
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
+
+    const throttleLine = logLines.find((l) => l.includes('babysit throttled'))
+    expect(throttleLine).toBeDefined()
+  })
+
+  it('does not spawn when babysit agent pid is still alive', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s5', identifier: 'ENG-94', startedAt: '2025-01-01T00:00:00Z', attempt: 5, exitCode: 1 },
+    ])
+
+    const isAliveImpl = (pid: number) => pid === 77777
+    vi.mocked(lockfile.isAlive).mockImplementation(isAliveImpl)
+
+    mockFsReadFile.mockResolvedValue(JSON.stringify({
+      lastSpawnedAt: new Date(Date.now() - 700_000).toISOString(),
+      pid: 77777,
+    }))
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
+
+    const stillRunningLine = logLines.find((l) => l.includes('babysit agent still running'))
+    expect(stillRunningLine).toBeDefined()
+  })
+
+  it('spawns babysit when cooldown expired', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s6', identifier: 'ENG-95', startedAt: '2025-01-01T00:00:00Z', attempt: 4, exitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    mockFsReadFile.mockResolvedValue(JSON.stringify({
+      lastSpawnedAt: new Date(Date.now() - 700_000).toISOString(),
+      pid: 88888,
+    }))
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).toHaveBeenCalled()
   })
 })

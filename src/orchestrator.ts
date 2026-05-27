@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises'
-import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, log } from './config.js'
+import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, BABYSIT_STATE, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToBlocked, postComment } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
-import { spawnAgent, spawnContinuation } from './runner.js'
+import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
 import type { IssueInfo } from './linear.js'
 import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody } from './github.js'
 import { reviewPr } from './review.js'
@@ -32,6 +32,7 @@ export async function tick(): Promise<void> {
 
   await pollSentry()
   await detectStalls()
+  await detectStuck()
   const completed = await cleanup()
 
   for (const agent of completed) {
@@ -259,6 +260,54 @@ async function reconcile(): Promise<void> {
     } catch (err) {
       log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 're-dispatch failed')
     }
+  }
+}
+
+async function readBabysitState(): Promise<{ lastSpawnedAt: string; pid: number } | null> {
+  try {
+    return JSON.parse(await fs.readFile(BABYSIT_STATE, 'utf-8'))
+  } catch {
+    return null
+  }
+}
+
+async function writeBabysitState(pid: number): Promise<void> {
+  await fs.writeFile(BABYSIT_STATE, JSON.stringify({ lastSpawnedAt: new Date().toISOString(), pid }))
+}
+
+export async function detectStuck(): Promise<void> {
+  const locks = await listLocks()
+  const stuckLocks = locks.filter(
+    (lock) => !isAlive(lock.pid) && lock.attempt >= config.babysitThreshold,
+  )
+
+  if (stuckLocks.length === 0) return
+
+  const state = await readBabysitState()
+  if (state) {
+    const elapsed = Date.now() - new Date(state.lastSpawnedAt).getTime()
+    if (elapsed < config.babysitCooldownMs) {
+      log.info({ elapsedMs: elapsed, cooldownMs: config.babysitCooldownMs }, 'babysit throttled')
+      return
+    }
+    if (isAlive(state.pid)) {
+      log.info({ pid: state.pid }, 'babysit agent still running')
+      return
+    }
+  }
+
+  const context = stuckLocks.map((lock) =>
+    `Issue ${lock.identifier} (${lock.issueId}): attempt=${lock.attempt}, exitCode=${lock.exitCode ?? 'none'}, pid=${lock.pid} (dead)`,
+  ).join('\n')
+
+  log.info({ stuckCount: stuckLocks.length }, 'stuck agents detected, spawning babysit')
+
+  try {
+    const pid = spawnBabysit(context)
+    await writeBabysitState(pid)
+    log.info({ pid, stuckCount: stuckLocks.length }, 'babysit agent spawned')
+  } catch (err) {
+    log.error({ error: String(err) }, 'failed to spawn babysit agent')
   }
 }
 

@@ -13,6 +13,8 @@ export const config = {
   stallTimeoutMs: Number(process.env.STALL_TIMEOUT_MS) || 600_000,
   maxTurns: Number(process.env.MAX_TURNS) || 5,
   maxAttempts: Number(process.env.MAX_ATTEMPTS) || 3,
+  babysitCooldownMs: Number(process.env.BABYSIT_COOLDOWN_MS) || 600_000,
+  babysitThreshold: Number(process.env.BABYSIT_THRESHOLD) || 3,
 }
 
 const BASE = path.join(os.homedir(), '.agent-harness')
@@ -21,5 +23,6 @@ export const WORKSPACES = path.join(BASE, 'workspaces')
 export const LOGS = path.join(BASE, 'logs')
 export const TOKENS_LOG = path.join(LOGS, 'tokens.jsonl')
 export const HANDOFFS = path.join(BASE, 'handoffs')
+export const BABYSIT_STATE = path.join(BASE, 'babysit-last.json')
 
 export const log = pino({ name: 'agent-harness' })
