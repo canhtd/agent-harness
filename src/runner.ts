@@ -10,6 +10,9 @@ export interface AgentRunner {
   spawn(issue: IssueInfo, workspacePath: string): number
 }
 
+const GH_TOKEN = process.env.GITHUB_BOT_TOKEN || process.env.GH_TOKEN || ''
+const agentEnv = GH_TOKEN ? { ...process.env, GH_TOKEN } : { ...process.env }
+
 export async function spawnAgent(issue: IssueInfo, ws: string, attempt?: number): Promise<number> {
   const prompt = await buildPrompt(issue, { attempt, repoPath: config.repoPath })
   const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'w')
@@ -18,7 +21,7 @@ export async function spawnAgent(issue: IssueInfo, ws: string, attempt?: number)
     cwd: ws,
     stdio: ['ignore', fd, fd],
     detached: true,
-    env: { ...process.env },
+    env: agentEnv,
   })
   child.unref()
   return child.pid!
@@ -32,7 +35,7 @@ export async function spawnContinuation(issue: IssueInfo, ws: string, reason: st
     cwd: ws,
     stdio: ['ignore', fd, fd],
     detached: true,
-    env: { ...process.env },
+    env: agentEnv,
   })
   child.unref()
   return child.pid!
