@@ -103,6 +103,45 @@ describe('recoverWorktree', () => {
     const result = recoverWorktree('/ws', meta)
     expect(result).toBe(false)
   })
+
+  it('logs warning when rebase state recovery fails', () => {
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (cmd === 'git rev-parse --git-dir') throw new Error('not a git repo')
+      if (cmd === 'git status --porcelain') return Buffer.from('\n')
+      return Buffer.from('')
+    })
+
+    const result = recoverWorktree('/ws', meta)
+    expect(result).toBe(false)
+    expect(logLines.some((l) => l.includes('rebase state recovery failed'))).toBe(true)
+  })
+
+  it('logs warning when dirty worktree recovery fails', () => {
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (cmd === 'git rev-parse --git-dir') return Buffer.from('.git\n')
+      if (cmd === 'git status --porcelain') return Buffer.from(' M file.ts\n')
+      if (cmd === 'git checkout -- .') throw new Error('checkout failed')
+      return Buffer.from('')
+    })
+    mockExistsSync.mockReturnValue(false)
+
+    const result = recoverWorktree('/ws', meta)
+    expect(result).toBe(true)
+    expect(logLines.some((l) => l.includes('dirty worktree recovery failed'))).toBe(true)
+    expect(logLines.some((l) => l.includes('unstaged-changes'))).toBe(true)
+  })
+
+  it('deduplicates stale-rebase when both dirs exist', () => {
+    mockExecSync.mockReturnValueOnce(Buffer.from('.git\n'))
+    mockExistsSync.mockReturnValue(true)
+    mockExecSync.mockReturnValueOnce(Buffer.from('\n'))
+
+    const result = recoverWorktree('/ws', meta)
+    expect(result).toBe(true)
+    const logEntry = logLines.find((l) => l.includes('worktree auto-recovered'))
+    const parsed = JSON.parse(logEntry!)
+    expect(parsed.recoveryType).toEqual(['stale-rebase'])
+  })
 })
 
 describe('runHook', () => {

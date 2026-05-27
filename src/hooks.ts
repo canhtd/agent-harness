@@ -57,23 +57,29 @@ export function recoverWorktree(
     const gitDir = execSync('git rev-parse --git-dir', { cwd: ws, stdio: 'pipe' }).toString().trim()
     const absGitDir = path.resolve(ws, gitDir)
 
+    let removedRebase = false
     for (const name of ['rebase-merge', 'rebase-apply']) {
       const dirPath = path.join(absGitDir, name)
       if (fsSync.existsSync(dirPath)) {
         fsSync.rmSync(dirPath, { recursive: true })
-        recovered.push('stale-rebase')
+        removedRebase = true
       }
     }
-  } catch { /* git dir not resolvable — skip */ }
+    if (removedRebase) recovered.push('stale-rebase')
+  } catch (err) {
+    log.warn({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, error: String(err) }, 'rebase state recovery failed')
+  }
 
   try {
     const status = execSync('git status --porcelain', { cwd: ws, stdio: 'pipe' }).toString().trim()
     if (status) {
+      recovered.push('unstaged-changes')
       execSync('git checkout -- .', { cwd: ws, stdio: 'pipe' })
       execSync('git clean -fd', { cwd: ws, stdio: 'pipe' })
-      recovered.push('unstaged-changes')
     }
-  } catch { /* recovery failed — caller will see hook fail */ }
+  } catch (err) {
+    log.warn({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, error: String(err) }, 'dirty worktree recovery failed')
+  }
 
   if (recovered.length > 0) {
     log.info(
