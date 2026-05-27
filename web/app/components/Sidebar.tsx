@@ -5,6 +5,19 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   {
+    href: "/",
+    label: "Dashboard",
+    exact: true,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/tokens",
     label: "Tokens",
     icon: (
@@ -35,7 +48,9 @@ export default function Sidebar() {
       <div className="sidebar-title">Agent Harness</div>
       <nav className="sidebar-nav">
         {NAV_ITEMS.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active = item.exact
+            ? pathname === item.href
+            : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
