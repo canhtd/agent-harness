@@ -190,14 +190,16 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
         log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review circuit breaker reset — new commits detected')
       }
 
-      const effectiveFailCount = (currentHead && failHead && currentHead !== failHead) ? 0 : failCount
+      const effectiveFailCount = lock?.reviewFailCount ?? 0
 
       if (effectiveFailCount >= 3) {
         log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber, reviewFailCount: effectiveFailCount }, 'review circuit breaker tripped')
         const lastError = lock?.reviewFailError ?? 'unknown error'
         try {
           await postComment(issue.id, `Review circuit breaker tripped after ${effectiveFailCount} consecutive failures. Last error: ${lastError}`)
-        } catch {}
+        } catch (err) {
+          log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post circuit breaker comment')
+        }
         await transitionToBlocked(issue.id)
         continue
       }
