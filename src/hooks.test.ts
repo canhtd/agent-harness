@@ -126,9 +126,9 @@ describe('recoverWorktree', () => {
     mockExistsSync.mockReturnValue(false)
 
     const result = recoverWorktree('/ws', meta)
-    expect(result).toBe(true)
+    expect(result).toBe(false)
     expect(logLines.some((l) => l.includes('dirty worktree recovery failed'))).toBe(true)
-    expect(logLines.some((l) => l.includes('unstaged-changes'))).toBe(true)
+    expect(logLines.some((l) => l.includes('unstaged-changes'))).toBe(false)
   })
 
   it('deduplicates stale-rebase when both dirs exist', () => {

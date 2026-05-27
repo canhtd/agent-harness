@@ -73,9 +73,9 @@ export function recoverWorktree(
   try {
     const status = execSync('git status --porcelain', { cwd: ws, stdio: 'pipe' }).toString().trim()
     if (status) {
-      recovered.push('unstaged-changes')
       execSync('git checkout -- .', { cwd: ws, stdio: 'pipe' })
       execSync('git clean -fd', { cwd: ws, stdio: 'pipe' })
+      recovered.push('unstaged-changes')
     }
   } catch (err) {
     log.warn({ issueId: meta.issueId, issueIdentifier: meta.issueIdentifier, error: String(err) }, 'dirty worktree recovery failed')
