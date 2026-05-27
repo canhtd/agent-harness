@@ -3,7 +3,7 @@ import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, BABYSIT_STATE, log } from '.
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock, type Lock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToInProgress, transitionToBlocked, postComment } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
-import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
+import { spawnAgent, spawnContinuation, spawnBabysit, spawnResearchAgent } from './runner.js'
 import type { IssueInfo } from './linear.js'
 import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody, getPrHeadSha } from './github.js'
 import { reviewPr } from './review.js'
@@ -106,6 +106,23 @@ export async function tick(): Promise<void> {
       log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, cumulativeCost }, 'cost guard tripped')
       postComment(issue.id, `Cost guard: cumulative cost $${cumulativeCost.toFixed(2)} exceeds $${config.maxCostPerIssueUsd} limit`).catch(() => {})
       transitionToBlocked(issue.id).catch(() => {})
+      continue
+    }
+
+    const isResearch = issue.labels.some(l => config.researchLabels.includes(l.toLowerCase()))
+    if (isResearch) {
+      const pid = spawnResearchAgent(issue)
+      await writeLock({
+        pid,
+        issueId: issue.id,
+        identifier: issue.identifier,
+        startedAt: new Date().toISOString(),
+        attempt: 1,
+        turn: 1,
+        stateName: 'research',
+      })
+      transitionToInProgress(issue.id).catch(() => {})
+      log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid }, 'research agent spawned')
       continue
     }
 
