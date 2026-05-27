@@ -288,10 +288,12 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
       isFreshAttempt ? `re-dispatching fresh attempt ${attempt}/${config.maxAttempts}` : `turn ${turn} failed, dispatching turn ${nextTurn}`,
     )
 
-    try {
-      await postComment(issue.id, `**Turn ${turn} result**: ${outcome.reason}\n\nDispatching turn ${nextTurn} to fix.`)
-    } catch (err) {
-      log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post turn comment')
+    if (!isFreshAttempt) {
+      try {
+        await postComment(issue.id, `**Turn ${turn} result**: ${outcome.reason}\n\nDispatching turn ${nextTurn} to fix.`)
+      } catch (err) {
+        log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post turn comment')
+      }
     }
 
     try {
