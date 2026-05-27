@@ -10,13 +10,11 @@ export interface AgentRunner {
   spawn(issue: IssueInfo, workspacePath: string): number
 }
 
-const GH_TOKEN = process.env.GITHUB_BOT_TOKEN || process.env.GH_TOKEN || ''
-const agentEnv = GH_TOKEN ? { ...process.env, GH_TOKEN } : { ...process.env }
-
 export async function spawnAgent(issue: IssueInfo, ws: string, attempt?: number): Promise<number> {
   const prompt = await buildPrompt(issue, { attempt, repoPath: config.repoPath })
   const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'w')
   const exitCodeFile = path.join(LOCKS, `${issue.id}.exit`)
+  const { GITHUB_BOT_TOKEN: _, ...agentEnv } = process.env
   const child = spawn('sh', ['-c', 'claude -p "$1" --verbose --output-format stream-json; echo $? > "$2"', '_', prompt, exitCodeFile], {
     cwd: ws,
     stdio: ['ignore', fd, fd],
@@ -31,11 +29,12 @@ export async function spawnContinuation(issue: IssueInfo, ws: string, reason: st
   const prompt = buildContinuationPrompt(issue, reason)
   const fd = openSync(path.join(LOGS, `${sanitize(issue.identifier)}.log`), 'a')
   const exitCodeFile = path.join(LOCKS, `${issue.id}.exit`)
+  const { GITHUB_BOT_TOKEN: _bot, ...contEnv } = process.env
   const child = spawn('sh', ['-c', 'claude -p "$1" --continue --verbose --output-format stream-json; echo $? > "$2"', '_', prompt, exitCodeFile], {
     cwd: ws,
     stdio: ['ignore', fd, fd],
     detached: true,
-    env: agentEnv,
+    env: contEnv,
   })
   child.unref()
   return child.pid!
