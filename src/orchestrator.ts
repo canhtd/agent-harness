@@ -2,8 +2,9 @@ import fs from 'node:fs/promises'
 import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, BABYSIT_STATE, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock, type Lock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToInProgress, transitionToBlocked, postComment } from './linear.js'
-import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
-import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
+import path from 'node:path'
+import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath, sanitize } from './workspace.js'
+import { spawnAgent, spawnContinuation, spawnBabysit, spawnResearchAgent } from './runner.js'
 import type { IssueInfo } from './linear.js'
 import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody, getPrHeadSha } from './github.js'
 import { reviewPr } from './review.js'
@@ -11,6 +12,33 @@ import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
 import { findSessionJsonl, aggregateTokens, appendTokenRecord, getCumulativeCost } from './tokens.js'
 import { writeHandoff, removeHandoff } from './handoff.js'
+
+export async function parseResearchLog(logPath: string): Promise<string> {
+  let content: string
+  try {
+    content = await fs.readFile(logPath, 'utf-8')
+  } catch {
+    return ''
+  }
+  const texts: string[] = []
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const obj = JSON.parse(line)
+      if (obj.type === 'assistant' && Array.isArray(obj.message?.content)) {
+        for (const block of obj.message.content) {
+          if (block.type === 'text' && block.text) texts.push(block.text)
+        }
+      }
+      if (obj.type === 'result' && Array.isArray(obj.result?.content)) {
+        for (const block of obj.result.content) {
+          if (block.type === 'text' && block.text) texts.push(block.text)
+        }
+      }
+    } catch {}
+  }
+  return texts.join('\n\n')
+}
 
 export async function tick(): Promise<void> {
   log.info('tick start')
@@ -60,6 +88,23 @@ export async function tick(): Promise<void> {
       }
     } catch (err) {
       log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'token aggregation failed')
+    }
+
+    try {
+      const lock = await readLock(agent.issueId)
+      if (lock?.stateName === 'research' && lock.exitCode === 0) {
+        const logPath = path.join(LOGS, `${sanitize(agent.identifier)}.log`)
+        const text = await parseResearchLog(logPath)
+        if (text) {
+          await postComment(agent.issueId, text)
+          log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research output posted')
+        }
+        await transitionToDone(agent.issueId)
+        await removeLock(agent.issueId)
+        log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research complete')
+      }
+    } catch (err) {
+      log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'research completion failed')
     }
   }
 
@@ -111,6 +156,27 @@ export async function tick(): Promise<void> {
 
     if (issue.stateName === 'Rework' && reworkRunning >= config.maxReworkConcurrent) {
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'rework slots full')
+      continue
+    }
+
+    const isResearch = issue.labels.some(l => config.researchLabels.includes(l.toLowerCase()))
+    if (isResearch) {
+      try {
+        const pid = spawnResearchAgent(issue)
+        await writeLock({
+          pid,
+          issueId: issue.id,
+          identifier: issue.identifier,
+          startedAt: new Date().toISOString(),
+          attempt: 1,
+          turn: 1,
+          stateName: 'research',
+        })
+        transitionToInProgress(issue.id).catch(() => {})
+        log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid }, 'research agent spawned')
+      } catch (err) {
+        log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'research dispatch failed')
+      }
       continue
     }
 
@@ -169,6 +235,8 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
     if (stuckIssueIds.has(issue.id)) continue
 
     const lock = await readLock(issue.id)
+
+    if (lock?.stateName === 'research') continue
 
     if (lock && isAlive(lock.pid)) continue
 
