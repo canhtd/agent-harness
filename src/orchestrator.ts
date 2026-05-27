@@ -187,6 +187,13 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
 
     const lock = await readLock(issue.id)
 
+    if (lock?.stateName === 'research') {
+      if (!isAlive(lock.pid)) {
+        log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'research agent finished — skipping reconcile')
+      }
+      continue
+    }
+
     if (lock && isAlive(lock.pid)) continue
 
     if (lock?.exitCode !== undefined && lock.exitCode !== 0 && lock.notBefore) {
