@@ -18,6 +18,9 @@ export interface Lock {
   lastExitCode?: number
   notBefore?: string
   stateName?: string
+  reviewFailCount?: number
+  reviewFailPrHead?: string
+  reviewFailError?: string
 }
 
 export async function readLock(issueId: string): Promise<Lock | null> {

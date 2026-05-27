@@ -73,6 +73,7 @@ vi.mock('./github.js', () => ({
   closePr: vi.fn(),
   deleteRemoteBranch: vi.fn(),
   fetchLastReviewBody: vi.fn().mockReturnValue(''),
+  getPrHeadSha: vi.fn().mockReturnValue('abc123'),
 }))
 
 vi.mock('./review.js', () => ({
@@ -632,5 +633,143 @@ describe('detectStuck', () => {
     expect(vi.mocked(runner.spawnBabysit)).toHaveBeenCalled()
     expect(vi.mocked(runner.spawnContinuation)).not.toHaveBeenCalled()
     expect(vi.mocked(runner.spawnAgent)).not.toHaveBeenCalled()
+  })
+})
+
+describe('review circuit breaker', () => {
+  beforeEach(() => {
+    logLines.length = 0
+    vi.resetModules()
+  })
+
+  it('trips after 3 consecutive review failures', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const review = await import('./review.js')
+
+    vi.mocked(review.reviewPr).mockClear()
+    vi.mocked(linear.postComment).mockClear()
+    vi.mocked(linear.transitionToBlocked).mockClear()
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-rb1', identifier: 'ENG-110', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-rb1', identifier: 'ENG-110',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+      reviewFailCount: 3, reviewFailPrHead: 'abc123', reviewFailError: 'Cannot approve your own pull request',
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'review', prNumber: 81 })
+    vi.mocked(github.getPrHeadSha).mockReturnValue('abc123')
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(review.reviewPr)).not.toHaveBeenCalled()
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-rb1',
+      expect.stringContaining('Review circuit breaker tripped'),
+    )
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-rb1',
+      expect.stringContaining('Cannot approve your own pull request'),
+    )
+    expect(vi.mocked(linear.transitionToBlocked)).toHaveBeenCalledWith('issue-rb1')
+
+    const tripLine = logLines.find((l) => l.includes('review circuit breaker tripped'))
+    expect(tripLine).toBeDefined()
+  })
+
+  it('increments reviewFailCount on review error', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const review = await import('./review.js')
+
+    vi.mocked(lockfile.writeLock).mockClear()
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-rb2', identifier: 'ENG-111', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-rb2', identifier: 'ENG-111',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+      reviewFailCount: 1, reviewFailPrHead: 'abc123',
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'review', prNumber: 82 })
+    vi.mocked(github.getPrHeadSha).mockReturnValue('abc123')
+    vi.mocked(review.reviewPr).mockRejectedValue(new Error('Cannot approve your own pull request'))
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewFailCount: 2, reviewFailPrHead: 'abc123', reviewFailError: expect.stringContaining('Cannot approve') }),
+    )
+  })
+
+  it('resets reviewFailCount when new commits detected', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const review = await import('./review.js')
+
+    vi.mocked(review.reviewPr).mockClear()
+    vi.mocked(linear.transitionToBlocked).mockClear()
+    vi.mocked(lockfile.writeLock).mockClear()
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-rb3', identifier: 'ENG-112', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-rb3', identifier: 'ENG-112',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+      reviewFailCount: 3, reviewFailPrHead: 'old-sha', reviewFailError: 'some error',
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'review', prNumber: 83 })
+    vi.mocked(github.getPrHeadSha).mockReturnValue('new-sha')
+    vi.mocked(review.reviewPr).mockResolvedValue({ approved: true, results: [] })
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(review.reviewPr)).toHaveBeenCalledWith(83, '')
+    expect(vi.mocked(linear.transitionToBlocked)).not.toHaveBeenCalled()
+
+    const resetLine = logLines.find((l) => l.includes('review circuit breaker reset'))
+    expect(resetLine).toBeDefined()
+  })
+
+  it('resets reviewFailCount on successful review', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+    const github = await import('./github.js')
+    const review = await import('./review.js')
+
+    vi.mocked(lockfile.writeLock).mockClear()
+
+    vi.mocked(linear.fetchInProgressIssues).mockResolvedValue([
+      { id: 'issue-rb4', identifier: 'ENG-113', title: 'Test', description: '', priority: 2, labels: [], stateName: 'In Progress' },
+    ])
+    vi.mocked(lockfile.readLock).mockResolvedValue({
+      pid: 999, issueId: 'issue-rb4', identifier: 'ENG-113',
+      startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 2, exitCode: 0,
+      reviewFailCount: 2, reviewFailPrHead: 'abc123', reviewFailError: 'some error',
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    vi.mocked(github.checkPrStatus).mockReturnValue({ action: 'review', prNumber: 84 })
+    vi.mocked(github.getPrHeadSha).mockReturnValue('abc123')
+    vi.mocked(review.reviewPr).mockResolvedValue({ approved: false, results: [] })
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewFailCount: 0, reviewFailPrHead: undefined, reviewFailError: undefined }),
+    )
   })
 })
