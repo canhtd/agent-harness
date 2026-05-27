@@ -87,6 +87,10 @@ When an agent is killed mid-`git rebase`, the worktree retains a `rebase-merge` 
 2. `--ff-only` fails when local main has unpushed commits (local hotfix commit + PR squash merge creates different hash → diverge → ff-only rejects)
 3. Local main never has local-only commits — agents work in worktrees, all changes go through PRs. `reset --hard` is safe.
 
+## Review ENOENT khi claude chưa install xong
+
+`review.ts` dùng `spawn('claude', ...)` để chạy AI review. Nếu `claude` binary chưa install (máy mới, đang upgrade, hoặc agent vừa `npm install -g` giữa chừng), review fail `ENOENT` → post "CHANGES_REQUESTED" với lý do vô nghĩa → agent burn hết turns cố fix lỗi không phải của mình. Đã xảy ra với ENG-41: binary install lúc 08:10, review chạy lúc 08:08 → 4 turns wasted.
+
 ## Systemd KillMode=control-group kills detached agents
 
 Systemd default `KillMode=control-group` kills the entire cgroup on restart, including agent processes despite `detached: true` + `child.unref()`. Orchestrator detects main updated → `process.exit(0)` → systemd restart → agents killed mid-task. Fix: `KillMode=process` in the service file — systemd only kills the main process (node), detached agents continue running.
