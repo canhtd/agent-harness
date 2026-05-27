@@ -2,6 +2,17 @@ import { execSync } from 'node:child_process'
 import { config, log } from './config.js'
 import { sanitize } from './workspace.js'
 
+const GH_TOKEN = process.env.GITHUB_BOT_TOKEN || process.env.GH_TOKEN || ''
+
+function ghExec(cmd: string, opts?: { timeout?: number }): string {
+  return execSync(cmd, {
+    cwd: config.repoPath,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: opts?.timeout ?? 30_000,
+    env: GH_TOKEN ? { ...process.env, GH_TOKEN } : process.env,
+  }).toString().trim()
+}
+
 export type PrOutcome =
   | { action: 'done' }
   | { action: 'skip'; reason: string }
@@ -12,10 +23,9 @@ export function checkPrStatus(identifier: string): PrOutcome {
   const branch = `agent/${sanitize(identifier)}`
   let prs: Array<{ number: number; state: string; mergeStateStatus: string; statusCheckRollup: Array<{ status: string; conclusion: string; state: string }> | null }>
   try {
-    const raw = execSync(
+    const raw = ghExec(
       `gh pr list --head "${branch}" --state all --json number,state,mergeStateStatus,statusCheckRollup`,
-      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
-    ).toString().trim()
+    )
     prs = JSON.parse(raw)
   } catch {
     return { action: 'redispatch', reason: 'failed to check PR status' }
@@ -81,10 +91,9 @@ export function checkPrStatus(identifier: string): PrOutcome {
 
 export function fetchLastReviewBody(prNumber: number): string {
   try {
-    return execSync(
+    return ghExec(
       `gh pr view ${prNumber} --json reviews --jq '.reviews | map(select(.state == "CHANGES_REQUESTED")) | last | .body'`,
-      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
-    ).toString().trim()
+    )
   } catch {
     return ''
   }
@@ -93,10 +102,9 @@ export function fetchLastReviewBody(prNumber: number): string {
 export function getOpenPrNumber(identifier: string): number | null {
   const branch = `agent/${sanitize(identifier)}`
   try {
-    const raw = execSync(
+    const raw = ghExec(
       `gh pr list --head "${branch}" --state open --json number`,
-      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
-    ).toString().trim()
+    )
     const prs = JSON.parse(raw) as Array<{ number: number }>
     return prs[0]?.number ?? null
   } catch {
@@ -106,20 +114,15 @@ export function getOpenPrNumber(identifier: string): number | null {
 
 export function closePr(prNumber: number): void {
   try {
-    execSync(`gh pr close ${prNumber}`, {
-      cwd: config.repoPath,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 30_000,
-    })
+    ghExec(`gh pr close ${prNumber}`)
   } catch {}
 }
 
 function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'none' {
   try {
-    const raw = execSync(
+    const raw = ghExec(
       `gh pr view ${prNumber} --json reviewDecision --jq '.reviewDecision'`,
-      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
-    ).toString().trim()
+    )
     if (raw === 'APPROVED') return 'approved'
     if (raw === 'CHANGES_REQUESTED') return 'changes_requested'
     return 'none'
@@ -130,10 +133,9 @@ function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'n
 
 export function hasNewCommitsSinceReview(prNumber: number): boolean {
   try {
-    const raw = execSync(
+    const raw = ghExec(
       `gh pr view ${prNumber} --json reviews,commits --jq '{ lastReview: ([.reviews[] | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")] | sort_by(.submittedAt) | last | .submittedAt), lastCommit: (.commits | last | .committedDate) }'`,
-      { cwd: config.repoPath, stdio: ['pipe', 'pipe', 'pipe'], timeout: 30_000 },
-    ).toString().trim()
+    )
     const { lastReview, lastCommit } = JSON.parse(raw)
     if (!lastReview || !lastCommit) return false
     return new Date(lastCommit) > new Date(lastReview)
@@ -144,22 +146,14 @@ export function hasNewCommitsSinceReview(prNumber: number): boolean {
 
 export function mergePr(prNumber: number): boolean {
   try {
-    execSync(`gh pr checks ${prNumber} --fail-fast`, {
-      cwd: config.repoPath,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 30_000,
-    })
+    ghExec(`gh pr checks ${prNumber} --fail-fast`)
   } catch {
     log.warn({ prNumber }, 'PR merge skipped — CI checks not passing')
     return false
   }
 
   try {
-    execSync(`gh pr merge ${prNumber} --squash`, {
-      cwd: config.repoPath,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 60_000,
-    })
+    ghExec(`gh pr merge ${prNumber} --squash`, { timeout: 60_000 })
     log.info({ prNumber }, 'PR auto-merged')
     return true
   } catch (err) {
