@@ -17,6 +17,13 @@ export interface TokenRecord {
   status: string;
 }
 
+export interface DailyActivity {
+  date: string;
+  completed: number;
+  failed: number;
+  totalCost: number;
+}
+
 interface RawRecord {
   task: string;
   date: string;
@@ -70,5 +77,19 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ sessions });
+  const dayMap = new Map<string, { completed: number; failed: number; totalCost: number }>();
+  for (const s of sessions) {
+    const day = s.date.slice(0, 10);
+    const entry = dayMap.get(day) ?? { completed: 0, failed: 0, totalCost: 0 };
+    if (s.status === "completed") entry.completed++;
+    if (s.status === "failed") entry.failed++;
+    entry.totalCost += s.estimated_cost_usd;
+    dayMap.set(day, entry);
+  }
+
+  const dailyActivity: DailyActivity[] = [...dayMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, v]) => ({ date, ...v }));
+
+  return NextResponse.json({ sessions, dailyActivity });
 }
