@@ -118,6 +118,13 @@ export function closePr(prNumber: number): void {
   } catch {}
 }
 
+export function deleteRemoteBranch(identifier: string): void {
+  const branch = `agent/${sanitize(identifier)}`
+  try {
+    ghExec(`git push origin --delete "${branch}"`)
+  } catch {}
+}
+
 function getReviewState(prNumber: number): 'approved' | 'changes_requested' | 'none' {
   try {
     const raw = ghExec(
