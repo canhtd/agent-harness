@@ -7,6 +7,8 @@ const mockSpawn = vi.fn().mockReturnValue({ unref: vi.fn(), pid: 12345 })
 vi.mock('node:fs', () => ({
   openSync: (...args: unknown[]) => mockOpenSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
+  writeFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
 }))
 
 vi.mock('node:child_process', () => ({
