@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import type { TokenRecord } from "../api/tokens/route";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import type { TokenRecord, DailyActivity } from "../api/tokens/route";
 
 type SortKey =
   | "task"
@@ -44,8 +44,65 @@ function statusBadge(status: string) {
   return <span className={className}>{status}</span>;
 }
 
+function DailyActivityChart({ data }: { data: DailyActivity[] }) {
+  const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const maxCount = Math.max(...data.map((d) => d.completed + d.failed), 1);
+
+  const handleMouseEnter = useCallback(
+    (idx: number, e: React.MouseEvent) => {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setHover({ idx, x: rect.left + rect.width / 2, y: rect.top });
+    },
+    [],
+  );
+  const handleMouseLeave = useCallback(() => setHover(null), []);
+
+  if (data.length === 0) return null;
+
+  const hovered = hover !== null ? data[hover.idx] : null;
+
+  return (
+    <div className="chart-container">
+      <div className="chart-label">Daily Activity</div>
+      <div className="chart-bars">
+        {data.map((d, i) => {
+          const completedH = (d.completed / maxCount) * 100;
+          const failedH = (d.failed / maxCount) * 100;
+          return (
+            <div
+              key={d.date}
+              className="chart-bar-col"
+              onMouseEnter={(e) => handleMouseEnter(i, e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <div className="chart-bar-stack" style={{ height: `${completedH + failedH}%` }}>
+                {d.failed > 0 && (
+                  <div className="chart-bar-segment chart-bar-failed" style={{ flexBasis: `${(d.failed / (d.completed + d.failed)) * 100}%` }} />
+                )}
+                {d.completed > 0 && (
+                  <div className="chart-bar-segment chart-bar-completed" style={{ flexBasis: `${(d.completed / (d.completed + d.failed)) * 100}%` }} />
+                )}
+              </div>
+              <span className="chart-bar-date">{d.date.slice(5)}</span>
+            </div>
+          );
+        })}
+      </div>
+      {hovered && hover && (
+        <div className="chart-tooltip" style={{ left: hover.x, top: hover.y }}>
+          <strong>{hovered.date}</strong>
+          <span>Completed: {hovered.completed}</span>
+          <span>Failed: {hovered.failed}</span>
+          <span>Cost: ${hovered.totalCost.toFixed(2)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TokensPage() {
   const [sessions, setSessions] = useState<TokenRecord[]>([]);
+  const [dailyActivity, setDailyActivity] = useState<DailyActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("estimated_cost_usd");
   const [sortAsc, setSortAsc] = useState(false);
@@ -56,7 +113,10 @@ export default function TokensPage() {
         if (!r.ok) throw new Error("fetch failed");
         return r.json();
       })
-      .then((data: { sessions: TokenRecord[] }) => setSessions(data.sessions))
+      .then((data: { sessions: TokenRecord[]; dailyActivity: DailyActivity[] }) => {
+        setSessions(data.sessions);
+        setDailyActivity(data.dailyActivity ?? []);
+      })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, []);
@@ -146,6 +206,8 @@ export default function TokensPage() {
           <span className="card-value">${avgCost.toFixed(2)}</span>
         </div>
       </div>
+
+      <DailyActivityChart data={dailyActivity} />
 
       {sessions.length === 0 ? (
         <p className="empty-state">No sessions recorded yet</p>
