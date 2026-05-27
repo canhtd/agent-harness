@@ -62,6 +62,7 @@ vi.mock('./github.js', () => ({
   checkPrStatus: vi.fn(),
   getOpenPrNumber: vi.fn().mockReturnValue(null),
   closePr: vi.fn(),
+  deleteRemoteBranch: vi.fn(),
   fetchLastReviewBody: vi.fn().mockReturnValue(''),
 }))
 
@@ -140,6 +141,7 @@ describe('reconcile: fresh attempt on max turns', () => {
 
     expect(vi.mocked(handoff.writeHandoff)).toHaveBeenCalledWith('issue-1', 'ENG-50', 1, 5, 42)
     expect(vi.mocked(github.closePr)).toHaveBeenCalledWith(42)
+    expect(vi.mocked(github.deleteRemoteBranch)).toHaveBeenCalledWith('ENG-50')
     expect(vi.mocked(workspace.removeWorktree)).toHaveBeenCalledWith('ENG-50')
     expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
       expect.objectContaining({ attempt: 2, turn: 0, pid: -1, exitCode: 0 }),
@@ -273,6 +275,7 @@ describe('reconcile: PR status checked before max turns', () => {
     await tick()
 
     expect(vi.mocked(github.closePr)).toHaveBeenCalledWith(88)
+    expect(vi.mocked(github.deleteRemoteBranch)).toHaveBeenCalledWith('ENG-62')
     expect(vi.mocked(workspace.removeWorktree)).toHaveBeenCalledWith('ENG-62')
     expect(vi.mocked(lockfile.writeLock)).toHaveBeenCalledWith(
       expect.objectContaining({ attempt: 2, turn: 0, pid: -1, exitCode: 0 }),

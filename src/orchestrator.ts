@@ -5,7 +5,7 @@ import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStat
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
 import { spawnAgent, spawnContinuation } from './runner.js'
 import type { IssueInfo } from './linear.js'
-import { checkPrStatus, getOpenPrNumber, closePr, fetchLastReviewBody } from './github.js'
+import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody } from './github.js'
 import { reviewPr } from './review.js'
 import { pollSentry } from './sentry.js'
 import { loadHooksConfig, runHook, type HooksConfig } from './hooks.js'
@@ -199,6 +199,7 @@ async function reconcile(): Promise<void> {
         await writeHandoff(issue.id, issue.identifier, attempt, turn, prNumber)
 
         if (prNumber !== null) closePr(prNumber)
+        deleteRemoteBranch(issue.identifier)
         try { await removeWorktree(issue.identifier) } catch {}
 
         const nextAttempt = attempt + 1
