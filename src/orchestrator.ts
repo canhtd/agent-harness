@@ -229,12 +229,12 @@ async function reconcile(): Promise<void> {
     const isFreshAttempt = turn === 0 && attempt > 1
 
     log.info(
-      { issueId: issue.id, issueIdentifier: issue.identifier, turn: nextTurn, attempt, reason: outcome.reason },
-      isFreshAttempt ? `re-dispatching fresh attempt ${attempt}/${config.maxAttempts}` : `re-dispatching turn ${nextTurn}`,
+      { issueId: issue.id, issueIdentifier: issue.identifier, previousTurn: turn, nextTurn, attempt, reason: outcome.reason },
+      isFreshAttempt ? `re-dispatching fresh attempt ${attempt}/${config.maxAttempts}` : `turn ${turn} failed, dispatching turn ${nextTurn}`,
     )
 
     try {
-      await postComment(issue.id, `**Turn ${nextTurn}**: ${outcome.reason}`)
+      await postComment(issue.id, `**Turn ${turn} result**: ${outcome.reason}\n\nDispatching turn ${nextTurn} to fix.`)
     } catch (err) {
       log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post turn comment')
     }

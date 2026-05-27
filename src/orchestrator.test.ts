@@ -313,7 +313,7 @@ describe('reconcile: post comment on redispatch', () => {
 
     expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
       'issue-c1',
-      '**Turn 3**: CI failed',
+      '**Turn 2 result**: CI failed\n\nDispatching turn 3 to fix.',
     )
     expect(vi.mocked(runner.spawnContinuation)).toHaveBeenCalled()
   })
