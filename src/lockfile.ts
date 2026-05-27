@@ -15,6 +15,7 @@ export interface Lock {
   attempt: number
   turn?: number
   exitCode?: number
+  lastExitCode?: number
   notBefore?: string
   stateName?: string
 }

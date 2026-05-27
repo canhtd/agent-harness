@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises'
-import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, log } from './config.js'
-import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock } from './lockfile.js'
+import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, BABYSIT_STATE, log } from './config.js'
+import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock, type Lock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToBlocked, postComment } from './linear.js'
 import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
-import { spawnAgent, spawnContinuation } from './runner.js'
+import { spawnAgent, spawnContinuation, spawnBabysit } from './runner.js'
 import type { IssueInfo } from './linear.js'
 import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody } from './github.js'
 import { reviewPr } from './review.js'
@@ -56,7 +56,8 @@ export async function tick(): Promise<void> {
     }
   }
 
-  await reconcile()
+  const stuckIssueIds = await detectStuck()
+  await reconcile(stuckIssueIds)
   await reconcileTerminal(hooks)
 
   const running = await countRunning()
@@ -128,6 +129,7 @@ export async function tick(): Promise<void> {
         attempt,
         turn: 1,
         stateName: issue.stateName,
+        lastExitCode: prevLock?.exitCode,
       })
       if (isRework) reworkRunning++
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, attempt }, 'agent spawned')
@@ -142,12 +144,14 @@ export async function tick(): Promise<void> {
   )
 }
 
-async function reconcile(): Promise<void> {
+async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
   const inProgress = await fetchInProgressIssues()
   const running = await countRunning()
   let slotsUsed = 0
 
   for (const issue of inProgress) {
+    if (stuckIssueIds.has(issue.id)) continue
+
     const lock = await readLock(issue.id)
 
     if (lock && isAlive(lock.pid)) continue
@@ -216,6 +220,7 @@ async function reconcile(): Promise<void> {
           turn: 0,
           stateName: issue.stateName,
           exitCode: 0,
+          lastExitCode: lock?.exitCode,
         })
       } else {
         await escalateToHuman(issue, lock)
@@ -253,6 +258,7 @@ async function reconcile(): Promise<void> {
         attempt,
         turn: nextTurn,
         stateName: issue.stateName,
+        lastExitCode: lock?.exitCode,
       })
       slotsUsed++
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, turn: nextTurn, attempt }, 'agent re-spawned')
@@ -260,6 +266,64 @@ async function reconcile(): Promise<void> {
       log.error({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 're-dispatch failed')
     }
   }
+}
+
+async function readBabysitState(): Promise<{ lastSpawnedAt: string; pid: number } | null> {
+  try {
+    return JSON.parse(await fs.readFile(BABYSIT_STATE, 'utf-8'))
+  } catch {
+    return null
+  }
+}
+
+async function writeBabysitState(pid: number): Promise<void> {
+  await fs.writeFile(BABYSIT_STATE, JSON.stringify({ lastSpawnedAt: new Date().toISOString(), pid }))
+}
+
+function isStuck(lock: Lock): boolean {
+  if (isAlive(lock.pid)) return false
+  if (lock.exitCode === undefined || lock.exitCode === 0) return false
+  if (lock.attempt >= config.babysitThreshold) return true
+  if (lock.lastExitCode !== undefined && lock.lastExitCode === lock.exitCode) return true
+  return false
+}
+
+export async function detectStuck(): Promise<Set<string>> {
+  const locks = await listLocks()
+  const stuckLocks = locks.filter(isStuck)
+  const stuckIssueIds = new Set(stuckLocks.map((l) => l.issueId))
+
+  if (stuckLocks.length === 0) return stuckIssueIds
+
+  const state = await readBabysitState()
+  if (state) {
+    const elapsed = Date.now() - new Date(state.lastSpawnedAt).getTime()
+    if (elapsed < config.babysitCooldownMs) {
+      log.info({ elapsedMs: elapsed, cooldownMs: config.babysitCooldownMs }, 'babysit throttled')
+      return stuckIssueIds
+    }
+    if (isAlive(state.pid)) {
+      log.info({ pid: state.pid }, 'babysit agent still running')
+      return stuckIssueIds
+    }
+  }
+
+  const context = stuckLocks.map((lock) => {
+    const reason = lock.attempt >= config.babysitThreshold ? 'exceeded max attempts' : `same exit code ${lock.exitCode} repeating`
+    return `Issue ${lock.identifier} (${lock.issueId}): attempt=${lock.attempt}, exitCode=${lock.exitCode ?? 'none'}, pid=${lock.pid} (dead), reason=${reason}`
+  }).join('\n')
+
+  log.info({ stuckCount: stuckLocks.length }, 'stuck agents detected, spawning babysit')
+
+  try {
+    const pid = spawnBabysit(context)
+    await writeBabysitState(pid)
+    log.info({ pid, stuckCount: stuckLocks.length }, 'babysit agent spawned')
+  } catch (err) {
+    log.error({ error: String(err) }, 'failed to spawn babysit agent')
+  }
+
+  return stuckIssueIds
 }
 
 async function escalateToHuman(issue: IssueInfo, lock: Awaited<ReturnType<typeof readLock>>): Promise<void> {

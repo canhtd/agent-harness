@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { openSync } from 'node:fs'
+import { openSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { config, LOCKS, LOGS } from './config.js'
 import { sanitize } from './workspace.js'
@@ -35,6 +35,22 @@ export async function spawnContinuation(issue: IssueInfo, ws: string, reason: st
     stdio: ['ignore', fd, fd],
     detached: true,
     env: contEnv,
+  })
+  child.unref()
+  return child.pid!
+}
+
+export function spawnBabysit(context: string): number {
+  const skillPath = path.join(config.repoPath, '.claude', 'skills', 'babysit', 'SKILL.md')
+  const skillContent = readFileSync(skillPath, 'utf-8')
+  const prompt = `You are a recovery agent. Follow the instructions below.\n\n${skillContent}\n\nContext:\n${context}`
+  const fd = openSync(path.join(LOGS, 'babysit.log'), 'a')
+  const { GITHUB_BOT_TOKEN: _token, ...babysitEnv } = process.env
+  const child = spawn('sh', ['-c', 'claude -p "$1" --verbose --output-format stream-json', '_', prompt], {
+    cwd: config.repoPath,
+    stdio: ['ignore', fd, fd],
+    detached: true,
+    env: babysitEnv,
   })
   child.unref()
   return child.pid!
