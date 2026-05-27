@@ -176,6 +176,12 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
 
     if (outcome.action === 'done') {
       await transitionToDone(issue.id)
+      try {
+        const msg = outcome.prNumber ? `PR #${outcome.prNumber} merged — done` : 'PR merged — done'
+        await postComment(issue.id, msg)
+      } catch (err) {
+        log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post merge comment')
+      }
       if (lock) await removeLock(issue.id)
       try { await removeWorktree(issue.identifier) } catch {}
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier }, 'PR merged, transitioned to Done')
@@ -221,6 +227,11 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
           await writeLock(lock)
         }
         if (review.approved) {
+          try {
+            await postComment(issue.id, `Review approved (PR #${outcome.prNumber}) — awaiting CI + merge`)
+          } catch (err) {
+            log.warn({ issueId: issue.id, issueIdentifier: issue.identifier, error: String(err) }, 'failed to post approval comment')
+          }
           log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review approved — awaiting merge')
         } else {
           log.info({ issueId: issue.id, issueIdentifier: issue.identifier, prNumber: outcome.prNumber }, 'review rejected — will re-dispatch')
