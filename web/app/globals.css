@@ -16,34 +16,65 @@
 body {
   background: var(--color-page);
   color: var(--color-ink);
+  margin: 0;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--color-card);
+  border-right: 1px solid var(--color-border);
+}
+
+.sidebar-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  padding: 1.25rem 1rem;
+  color: var(--color-ink);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-link:hover {
+  background: #f0f0f0;
+}
+
+.sidebar-link-active {
+  border-left-color: var(--color-accent);
+  background: rgba(16, 163, 127, 0.06);
+  color: var(--color-ink);
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .page {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-}
-
-.header-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.status-badge {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--color-accent);
-  background: rgba(16, 163, 127, 0.1);
-  padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
 }
 
 .cards-grid {
