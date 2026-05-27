@@ -44,7 +44,7 @@ export function spawnBabysit(context: string): number {
   const skillPath = path.join(config.repoPath, '.claude', 'skills', 'babysit', 'SKILL.md')
   const skillContent = readFileSync(skillPath, 'utf-8')
   const prompt = `You are a recovery agent. Follow the instructions below.\n\n${skillContent}\n\nContext:\n${context}`
-  const fd = openSync(path.join(LOGS, 'babysit.log'), 'w')
+  const fd = openSync(path.join(LOGS, 'babysit.log'), 'a')
   const { GITHUB_BOT_TOKEN: _token, ...babysitEnv } = process.env
   const child = spawn('sh', ['-c', 'claude -p "$1" --verbose --output-format stream-json', '_', prompt], {
     cwd: config.repoPath,

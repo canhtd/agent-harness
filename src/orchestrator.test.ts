@@ -464,12 +464,59 @@ describe('detectStuck', () => {
     expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
   })
 
-  it('does not spawn babysit when attempts below threshold', async () => {
+  it('does not spawn babysit when attempts below threshold and no repeating error', async () => {
     const lockfile = await import('./lockfile.js')
     const runner = await import('./runner.js')
 
     vi.mocked(lockfile.listLocks).mockResolvedValue([
       { pid: 999, issueId: 'issue-s3', identifier: 'ENG-92', startedAt: '2025-01-01T00:00:00Z', attempt: 2, exitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
+  })
+
+  it('does not spawn babysit when exitCode is undefined (cleanup not yet processed)', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s7', identifier: 'ENG-96', startedAt: '2025-01-01T00:00:00Z', attempt: 5 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).not.toHaveBeenCalled()
+  })
+
+  it('spawns babysit when same error code repeats even below threshold', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s8', identifier: 'ENG-97', startedAt: '2025-01-01T00:00:00Z', attempt: 2, exitCode: 1, lastExitCode: 1 },
+    ])
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+
+    const { detectStuck } = await import('./orchestrator.js')
+    await detectStuck()
+
+    expect(vi.mocked(runner.spawnBabysit)).toHaveBeenCalledWith(
+      expect.stringContaining('same exit code 1 repeating'),
+    )
+  })
+
+  it('does not trigger repeating-error when exit codes differ', async () => {
+    const lockfile = await import('./lockfile.js')
+    const runner = await import('./runner.js')
+
+    vi.mocked(lockfile.listLocks).mockResolvedValue([
+      { pid: 999, issueId: 'issue-s9', identifier: 'ENG-98', startedAt: '2025-01-01T00:00:00Z', attempt: 2, exitCode: 2, lastExitCode: 1 },
     ])
     vi.mocked(lockfile.isAlive).mockReturnValue(false)
 

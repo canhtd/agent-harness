@@ -32,7 +32,6 @@ export async function tick(): Promise<void> {
 
   await pollSentry()
   await detectStalls()
-  await detectStuck()
   const completed = await cleanup()
 
   for (const agent of completed) {
@@ -57,6 +56,7 @@ export async function tick(): Promise<void> {
     }
   }
 
+  await detectStuck()
   await reconcile()
   await reconcileTerminal(hooks)
 
@@ -129,6 +129,7 @@ export async function tick(): Promise<void> {
         attempt,
         turn: 1,
         stateName: issue.stateName,
+        lastExitCode: prevLock?.lastExitCode,
       })
       if (isRework) reworkRunning++
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, attempt }, 'agent spawned')
@@ -217,6 +218,7 @@ async function reconcile(): Promise<void> {
           turn: 0,
           stateName: issue.stateName,
           exitCode: 0,
+          lastExitCode: lock?.lastExitCode,
         })
       } else {
         await escalateToHuman(issue, lock)
@@ -254,6 +256,7 @@ async function reconcile(): Promise<void> {
         attempt,
         turn: nextTurn,
         stateName: issue.stateName,
+        lastExitCode: lock?.lastExitCode,
       })
       slotsUsed++
       log.info({ issueId: issue.id, issueIdentifier: issue.identifier, pid, turn: nextTurn, attempt }, 'agent re-spawned')
@@ -275,11 +278,17 @@ async function writeBabysitState(pid: number): Promise<void> {
   await fs.writeFile(BABYSIT_STATE, JSON.stringify({ lastSpawnedAt: new Date().toISOString(), pid }))
 }
 
+function isStuck(lock: Awaited<ReturnType<typeof readLock>>): boolean {
+  if (!lock || isAlive(lock.pid)) return false
+  if (lock.exitCode === undefined) return false
+  if (lock.attempt >= config.babysitThreshold) return true
+  if (lock.exitCode !== 0 && lock.lastExitCode !== undefined && lock.lastExitCode === lock.exitCode) return true
+  return false
+}
+
 export async function detectStuck(): Promise<void> {
   const locks = await listLocks()
-  const stuckLocks = locks.filter(
-    (lock) => !isAlive(lock.pid) && lock.attempt >= config.babysitThreshold,
-  )
+  const stuckLocks = locks.filter(isStuck)
 
   if (stuckLocks.length === 0) return
 
@@ -296,9 +305,10 @@ export async function detectStuck(): Promise<void> {
     }
   }
 
-  const context = stuckLocks.map((lock) =>
-    `Issue ${lock.identifier} (${lock.issueId}): attempt=${lock.attempt}, exitCode=${lock.exitCode ?? 'none'}, pid=${lock.pid} (dead)`,
-  ).join('\n')
+  const context = stuckLocks.map((lock) => {
+    const reason = lock!.attempt >= config.babysitThreshold ? 'exceeded max attempts' : `same exit code ${lock!.exitCode} repeating`
+    return `Issue ${lock!.identifier} (${lock!.issueId}): attempt=${lock!.attempt}, exitCode=${lock!.exitCode ?? 'none'}, pid=${lock!.pid} (dead), reason=${reason}`
+  }).join('\n')
 
   log.info({ stuckCount: stuckLocks.length }, 'stuck agents detected, spawning babysit')
 

@@ -79,7 +79,7 @@ describe('spawnBabysit', () => {
     )
     expect(mockOpenSync).toHaveBeenCalledWith(
       expect.stringContaining('babysit.log'),
-      'w',
+      'a',
     )
     expect(mockSpawn).toHaveBeenCalledWith(
       'sh',
