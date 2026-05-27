@@ -176,6 +176,30 @@ body {
   color: var(--cost-color);
 }
 
+.status-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.status-completed {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  color: #16a34a;
+}
+
+.status-failed {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #ef4444;
+}
+
+.status-unknown {
+  background: color-mix(in srgb, var(--color-muted) 12%, transparent);
+  color: var(--color-muted);
+}
+
 .empty-state {
   text-align: center;
   color: var(--color-muted);

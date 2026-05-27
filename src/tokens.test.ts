@@ -57,8 +57,10 @@ describe('aggregateTokens', () => {
     expect(record.output_tokens).toBe(1300)
     expect(record.cache_creation_tokens).toBe(2000)
     expect(record.cache_read_tokens).toBe(8000)
-    expect(record.turns).toBe(2)
+    expect(record.messages).toBe(2)
     expect(record.model).toBe('claude-opus-4-6')
+    expect(record.duration_seconds).toBe(0)
+    expect(record.status).toBe('unknown')
   })
 
   it('calculates opus cost correctly', () => {
@@ -129,7 +131,7 @@ describe('aggregateTokens', () => {
     fs.writeFileSync(tmpFile, mixed)
 
     const record = aggregateTokens(tmpFile, 'ENG-22')
-    expect(record.turns).toBe(1)
+    expect(record.messages).toBe(1)
     expect(record.input_tokens).toBe(100)
   })
 })
@@ -188,12 +190,14 @@ describe('appendTokenRecord', () => {
       task: 'ENG-15',
       date: '2026-05-26T00:00:00.000Z',
       model: 'claude-opus-4-6',
-      turns: 5,
+      messages: 5,
       input_tokens: 1000,
       output_tokens: 500,
       cache_creation_tokens: 200,
       cache_read_tokens: 300,
       estimated_cost_usd: 0.1,
+      duration_seconds: 120,
+      status: 'completed',
     }
 
     appendTokenRecord(record)
@@ -205,6 +209,9 @@ describe('appendTokenRecord', () => {
     const parsed = JSON.parse(lines[0])
     expect(parsed.task).toBe('ENG-15')
     expect(parsed.estimated_cost_usd).toBe(0.1)
+    expect(parsed.messages).toBe(5)
+    expect(parsed.duration_seconds).toBe(120)
+    expect(parsed.status).toBe('completed')
   })
 
   it('appends multiple records as separate lines', () => {
@@ -212,12 +219,14 @@ describe('appendTokenRecord', () => {
       task: 'ENG-1',
       date: '2026-05-26T00:00:00.000Z',
       model: 'claude-opus-4-6',
-      turns: 1,
+      messages: 1,
       input_tokens: 100,
       output_tokens: 50,
       cache_creation_tokens: 0,
       cache_read_tokens: 0,
       estimated_cost_usd: 0.01,
+      duration_seconds: 60,
+      status: 'completed',
     }
 
     appendTokenRecord(base)

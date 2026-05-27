@@ -5,12 +5,12 @@ import type { TokenRecord } from "../api/tokens/route";
 
 type SortKey =
   | "task"
-  | "date"
+  | "status"
   | "model"
-  | "turns"
+  | "messages"
   | "input_tokens"
   | "output_tokens"
-  | "cache_read_tokens"
+  | "duration_seconds"
   | "estimated_cost_usd";
 
 function formatTokens(n: number): string {
@@ -19,16 +19,35 @@ function formatTokens(n: number): string {
   return n.toLocaleString();
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "—";
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  }
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+}
+
 function costColor(cost: number): string {
   if (cost > 15) return "var(--color-cost-red)";
   if (cost >= 8) return "var(--color-cost-yellow)";
   return "var(--color-cost-green)";
 }
 
+function statusBadge(status: string) {
+  let className = "status-badge status-unknown";
+  if (status === "completed") className = "status-badge status-completed";
+  else if (status === "failed") className = "status-badge status-failed";
+  return <span className={className}>{status}</span>;
+}
+
 export default function TokensPage() {
   const [sessions, setSessions] = useState<TokenRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortKey, setSortKey] = useState<SortKey>("estimated_cost_usd");
   const [sortAsc, setSortAsc] = useState(false);
 
   useEffect(() => {
@@ -66,13 +85,9 @@ export default function TokensPage() {
 
   const totals = useMemo(
     () => ({
-      turns: sessions.reduce((s, r) => s + r.turns, 0),
+      messages: sessions.reduce((s, r) => s + r.messages, 0),
       input_tokens: sessions.reduce((s, r) => s + r.input_tokens, 0),
       output_tokens: sessions.reduce((s, r) => s + r.output_tokens, 0),
-      cache_read_tokens: sessions.reduce(
-        (s, r) => s + r.cache_read_tokens,
-        0,
-      ),
       estimated_cost_usd: totalCost,
     }),
     [sessions, totalCost],
@@ -94,12 +109,12 @@ export default function TokensPage() {
 
   const columns: { key: SortKey; label: string }[] = [
     { key: "task", label: "Task" },
-    { key: "date", label: "Date" },
+    { key: "status", label: "Status" },
     { key: "model", label: "Model" },
-    { key: "turns", label: "Turns" },
+    { key: "messages", label: "Messages" },
     { key: "input_tokens", label: "Input tokens" },
     { key: "output_tokens", label: "Output tokens" },
-    { key: "cache_read_tokens", label: "Cache read" },
+    { key: "duration_seconds", label: "Duration" },
     { key: "estimated_cost_usd", label: "Cost" },
   ];
 
@@ -155,11 +170,9 @@ export default function TokensPage() {
               {sorted.map((r, i) => (
                 <tr key={`${r.task}-${r.date}-${i}`} className="table-row">
                   <td className="table-td font-medium">{r.task}</td>
-                  <td className="table-td text-muted">
-                    {new Date(r.date).toLocaleDateString()}
-                  </td>
+                  <td className="table-td">{statusBadge(r.status)}</td>
                   <td className="table-td text-muted">{r.model}</td>
-                  <td className="table-td text-right">{r.turns}</td>
+                  <td className="table-td text-right">{r.messages}</td>
                   <td className="table-td text-right">
                     {formatTokens(r.input_tokens)}
                   </td>
@@ -167,7 +180,7 @@ export default function TokensPage() {
                     {formatTokens(r.output_tokens)}
                   </td>
                   <td className="table-td text-right">
-                    {formatTokens(r.cache_read_tokens)}
+                    {formatDuration(r.duration_seconds)}
                   </td>
                   <td className="table-td text-right">
                     <span
@@ -189,16 +202,14 @@ export default function TokensPage() {
                 <td className="table-td font-medium" colSpan={3}>
                   Totals
                 </td>
-                <td className="table-td text-right">{totals.turns}</td>
+                <td className="table-td text-right">{totals.messages}</td>
                 <td className="table-td text-right">
                   {formatTokens(totals.input_tokens)}
                 </td>
                 <td className="table-td text-right">
                   {formatTokens(totals.output_tokens)}
                 </td>
-                <td className="table-td text-right">
-                  {formatTokens(totals.cache_read_tokens)}
-                </td>
+                <td className="table-td text-right"></td>
                 <td className="table-td text-right font-medium">
                   ${totals.estimated_cost_usd.toFixed(2)}
                 </td>
