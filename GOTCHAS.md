@@ -87,6 +87,10 @@ Khi agent bị kill giữa chừng `git rebase`, worktree giữ lại `rebase-me
 2. `--ff-only` fail khi local main có commit chưa push (hotfix commit trên local + PR squash merge tạo hash khác → diverge → ff-only reject)
 3. Local main không bao giờ có local-only commits — agents làm việc trong worktree, mọi thay đổi qua PR. `reset --hard` an toàn.
 
+## Systemd KillMode=control-group kills detached agents
+
+Systemd default `KillMode=control-group` kill toàn bộ cgroup khi restart, bao gồm agent processes dù đã `detached: true` + `child.unref()`. Orchestrator detect main updated → `process.exit(0)` → systemd restart → agents bị kill giữa chừng. Fix: `KillMode=process` trong service file — systemd chỉ kill main process (node), agents detached tiếp tục chạy.
+
 ## Không code tay — tạo issue để agent tự build
 
 Agent harness tự build chính nó (bootstrapping). Mọi feature/fix phải tạo Linear issue → orchestrator dispatch agent → agent implement. Không code tay rồi push trực tiếp. Chỉ code tay khi agent không thể tự làm (ví dụ: fix orchestrator đang broken không dispatch được).

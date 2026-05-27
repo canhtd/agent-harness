@@ -54,7 +54,7 @@ Hệ thống tự vận hành ổn định.
 
 - [x] Auto-restart orchestrator sau khi main thay đổi (detect main updated → exit → systemd restart)
 - [ ] Merge queue (GitHub merge queue) — rebase + re-run CI trước merge
-- [x] Process manager: launchd trên Mac (ENG-27), systemd trên Ubuntu
+- [x] Process manager: launchd trên Mac (ENG-27), systemd trên Ubuntu (`KillMode=process` bắt buộc — default `control-group` kill detached agents khi restart)
 - [x] Full pipeline test: ENG-14 dispatch → code + test → PR → review → merge ✅
 - [x] Stall detection fix — stream-json output + 600s timeout (ENG-32)
 - [x] gh CLI auth fix cho agent env (ENG-33)
