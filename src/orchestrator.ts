@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises'
+import path from 'node:path'
 import { config, LOCKS, WORKSPACES, LOGS, HANDOFFS, BABYSIT_STATE, log } from './config.js'
 import { readLock, writeLock, isAlive, cleanup, countRunning, countRunningByState, detectStalls, listLocks, removeLock, type Lock } from './lockfile.js'
 import { fetchCandidates, fetchInProgressIssues, fetchIssueState, fetchIssueStateByIdentifier, transitionToDone, transitionToInProgress, transitionToBlocked, postComment } from './linear.js'
-import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath } from './workspace.js'
+import { ensureWorktree, removeWorktree, listWorktreeIdentifiers, workspacePath, sanitize } from './workspace.js'
 import { spawnAgent, spawnContinuation, spawnBabysit, spawnResearchAgent } from './runner.js'
 import type { IssueInfo } from './linear.js'
 import { checkPrStatus, getOpenPrNumber, closePr, deleteRemoteBranch, fetchLastReviewBody, getPrHeadSha } from './github.js'
@@ -60,6 +61,41 @@ export async function tick(): Promise<void> {
       }
     } catch (err) {
       log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'token aggregation failed')
+    }
+
+    const lock = await readLock(agent.issueId)
+    if (lock?.stateName === 'research') {
+      if (lock.exitCode === 0) {
+        try {
+          const logPath = path.join(LOGS, `${sanitize(agent.identifier)}.log`)
+          const content = await fs.readFile(logPath, 'utf-8')
+          const texts: string[] = []
+          for (const line of content.split('\n')) {
+            if (!line.trim()) continue
+            try {
+              const entry = JSON.parse(line)
+              if (entry.type !== 'assistant') continue
+              const msg = entry.message?.content
+              if (!Array.isArray(msg)) continue
+              for (const c of msg) {
+                if (c.type === 'text' && c.text) texts.push(c.text)
+              }
+            } catch {}
+          }
+          const output = texts.join('\n\n') || '(no output)'
+          await postComment(agent.issueId, output)
+          await transitionToDone(agent.issueId)
+          await removeLock(agent.issueId)
+          log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research completed')
+        } catch (err) {
+          log.error({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'research completion failed')
+          await removeLock(agent.issueId).catch(() => {})
+        }
+      } else {
+        await removeLock(agent.issueId).catch(() => {})
+        log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, exitCode: lock.exitCode }, 'research agent failed')
+      }
+      continue
     }
   }
 
