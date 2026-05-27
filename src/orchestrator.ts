@@ -102,6 +102,11 @@ export async function tick(): Promise<void> {
         await transitionToDone(agent.issueId)
         await removeLock(agent.issueId)
         log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research complete')
+      } else if (lock?.stateName === 'research' && lock.exitCode !== undefined && lock.exitCode !== 0) {
+        await postComment(agent.issueId, `Research agent failed (exit code ${lock.exitCode})`).catch(() => {})
+        await removeLock(agent.issueId)
+        await transitionToBlocked(agent.issueId)
+        log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, exitCode: lock.exitCode }, 'research agent failed')
       }
     } catch (err) {
       log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'research completion failed')

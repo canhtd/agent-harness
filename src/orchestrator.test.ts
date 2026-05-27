@@ -1027,6 +1027,40 @@ describe('research completion', () => {
     const completeLine = logLines.find((l) => l.includes('research complete'))
     expect(completeLine).toBeDefined()
   })
+
+  it('removes lock and transitions to Blocked when research agent fails', async () => {
+    const lockfile = await import('./lockfile.js')
+    const linear = await import('./linear.js')
+
+    vi.mocked(lockfile.cleanup).mockResolvedValue([
+      { issueId: 'issue-rf1', identifier: 'ENG-211' },
+    ])
+
+    vi.mocked(lockfile.readLock).mockImplementation(async () => {
+      return { pid: 88888, issueId: 'issue-rf1', identifier: 'ENG-211', startedAt: '2025-01-01T00:00:00Z', attempt: 1, turn: 1, stateName: 'research', exitCode: 1 }
+    })
+    vi.mocked(lockfile.isAlive).mockReturnValue(false)
+    mockFsReadFile.mockRejectedValue(new Error('ENOENT'))
+
+    vi.mocked(linear.postComment).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(linear.transitionToDone).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(linear.transitionToBlocked).mockClear().mockResolvedValue(undefined as any)
+    vi.mocked(lockfile.removeLock).mockClear()
+
+    const { tick } = await import('./orchestrator.js')
+    await tick()
+
+    expect(vi.mocked(linear.postComment)).toHaveBeenCalledWith(
+      'issue-rf1',
+      'Research agent failed (exit code 1)',
+    )
+    expect(vi.mocked(lockfile.removeLock)).toHaveBeenCalledWith('issue-rf1')
+    expect(vi.mocked(linear.transitionToBlocked)).toHaveBeenCalledWith('issue-rf1')
+    expect(vi.mocked(linear.transitionToDone)).not.toHaveBeenCalledWith('issue-rf1')
+
+    const failLine = logLines.find((l) => l.includes('research agent failed'))
+    expect(failLine).toBeDefined()
+  })
 })
 
 describe('research reconcile skip', () => {
