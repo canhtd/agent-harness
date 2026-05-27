@@ -124,6 +124,18 @@ export function buildContinuationPrompt(issue: IssueInfo, reason: string): strin
   ].join('\n')
 }
 
+export function buildResearchPrompt(issue: IssueInfo): string {
+  return [
+    'You are a research agent. Analyze the issue and produce structured markdown output.',
+    'Do NOT create files, branches, or PRs. Do NOT modify any code.',
+    'Your entire response will be posted as a comment on the Linear issue.',
+    '',
+    `Issue: ${issue.identifier} — ${issue.title}`,
+    '',
+    issue.description ?? '',
+  ].join('\n')
+}
+
 export async function buildPrompt(
   issue: IssueInfo,
   opts: { attempt?: number; repoPath: string },
