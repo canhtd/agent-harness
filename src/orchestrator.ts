@@ -87,22 +87,29 @@ export async function tick(): Promise<void> {
     }
 
     const lock = await readLock(agent.issueId)
-    if (lock?.stateName === 'research' && lock.exitCode === 0) {
-      const logPath = path.join(LOGS, `${sanitize(agent.identifier)}.log`)
-      const output = extractAgentOutput(logPath)
-      if (output) {
-        try {
-          await postComment(agent.issueId, output)
-          log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research output posted')
-        } catch (err) {
-          log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'failed to post research output')
+    if (lock?.stateName === 'research') {
+      if (lock.exitCode === 0) {
+        const logPath = path.join(LOGS, `${sanitize(agent.identifier)}.log`)
+        const output = extractAgentOutput(logPath)
+        if (output) {
+          try {
+            await postComment(agent.issueId, output)
+            log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research output posted')
+          } catch (err) {
+            log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'failed to post research output')
+          }
         }
-      }
-      try {
-        await transitionToDone(agent.issueId)
-        log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research issue done')
-      } catch (err) {
-        log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'failed to transition research issue')
+        try {
+          await transitionToDone(agent.issueId)
+          log.info({ issueId: agent.issueId, issueIdentifier: agent.identifier }, 'research issue done')
+        } catch (err) {
+          log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, error: String(err) }, 'failed to transition research issue')
+        }
+      } else {
+        const msg = `Research agent failed (exit code ${lock.exitCode ?? 'unknown'})`
+        postComment(agent.issueId, msg).catch(() => {})
+        transitionToBlocked(agent.issueId).catch(() => {})
+        log.warn({ issueId: agent.issueId, issueIdentifier: agent.identifier, exitCode: lock.exitCode }, 'research agent failed')
       }
       await removeLock(agent.issueId)
     }
@@ -236,9 +243,9 @@ async function reconcile(stuckIssueIds: Set<string>): Promise<void> {
 
     const lock = await readLock(issue.id)
 
-    if (lock?.stateName === 'research') continue
-
     if (lock && isAlive(lock.pid)) continue
+
+    if (lock?.stateName === 'research') continue
 
     if (lock?.exitCode !== undefined && lock.exitCode !== 0 && lock.notBefore) {
       if (Date.now() < new Date(lock.notBefore).getTime()) continue
