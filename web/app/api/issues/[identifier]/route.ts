@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
@@ -201,24 +201,18 @@ async function gatherAgentMeta(
   let hasLock = false;
 
   try {
-    const files = await readdir(locksDir);
-    const lockFile = files.find(
-      (f) => f === `${issueId}.json`,
-    );
-    if (lockFile) {
-      const raw = await readFile(join(locksDir, lockFile), "utf-8");
-      const lock = JSON.parse(raw) as {
-        pid: number;
-        attempt: number;
-        turn?: number;
-      };
-      hasLock = true;
-      attempt = lock.attempt;
-      turn = lock.turn ?? 0;
-      alive = isAlive(lock.pid);
-    }
+    const raw = await readFile(join(locksDir, `${issueId}.json`), "utf-8");
+    const lock = JSON.parse(raw) as {
+      pid: number;
+      attempt: number;
+      turn?: number;
+    };
+    hasLock = true;
+    attempt = lock.attempt;
+    turn = lock.turn ?? 0;
+    alive = isAlive(lock.pid);
   } catch {
-    // locks dir doesn't exist
+    // lockfile doesn't exist
   }
 
   if (!hasTokens && !hasLock) return undefined;
