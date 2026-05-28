@@ -1,4 +1,17 @@
 import { NextResponse } from "next/server";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+
+export interface AgentMeta {
+  totalCost: number;
+  attempt: number;
+  turn: number;
+  alive: boolean;
+  lastStatus: string;
+  durationSeconds: number;
+  prSearchUrl: string;
+}
 
 export interface IssueDetail {
   id: string;
@@ -12,6 +25,7 @@ export interface IssueDetail {
   state: { id: string; name: string; type: string; color: string };
   labels: Array<{ id: string; name: string; color: string }>;
   assignee: { id: string; displayName: string; avatarUrl: string } | null;
+  agentMeta?: AgentMeta;
 }
 
 const QUERY = `
@@ -110,6 +124,8 @@ export async function GET(
     );
   }
 
+  const agentMeta = await gatherAgentMeta(node.id, node.identifier);
+
   const issue: IssueDetail = {
     id: node.id,
     identifier: node.identifier,
@@ -122,9 +138,105 @@ export async function GET(
     state: node.state,
     labels: node.labels.nodes,
     assignee: node.assignee,
+    agentMeta,
   };
 
   return NextResponse.json({ issue });
+}
+
+function isAlive(pid: number): boolean {
+  if (pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function gatherAgentMeta(
+  issueId: string,
+  identifier: string,
+): Promise<AgentMeta | undefined> {
+  const tokensPath =
+    process.env.TOKENS_LOG_PATH ||
+    join(homedir(), ".agent-harness", "logs", "tokens.jsonl");
+  const locksDir =
+    process.env.LOCKS_DIR ||
+    join(homedir(), ".agent-harness", "locks");
+  const repo = process.env.GITHUB_REPO || "canhtd/agent-harness";
+
+  let totalCost = 0;
+  let lastStatus = "";
+  let durationSeconds = 0;
+  let hasTokens = false;
+
+  try {
+    const content = await readFile(tokensPath, "utf-8");
+    const lines = content.split("\n").filter((l) => l.trim());
+    for (const line of lines) {
+      try {
+        const rec = JSON.parse(line) as {
+          identifier?: string;
+          status?: string;
+          duration_seconds?: number;
+          estimated_cost_usd?: number;
+        };
+        if (rec.identifier !== identifier) continue;
+        hasTokens = true;
+        totalCost += rec.estimated_cost_usd ?? 0;
+        if (rec.status) lastStatus = rec.status;
+        if (rec.duration_seconds != null) durationSeconds = rec.duration_seconds;
+      } catch {
+        // skip malformed lines
+      }
+    }
+  } catch {
+    // tokens file doesn't exist
+  }
+
+  let attempt = 0;
+  let turn = 0;
+  let alive = false;
+  let hasLock = false;
+
+  try {
+    const files = await readdir(locksDir);
+    const lockFile = files.find(
+      (f) => f === `${issueId}.json`,
+    );
+    if (lockFile) {
+      const raw = await readFile(join(locksDir, lockFile), "utf-8");
+      const lock = JSON.parse(raw) as {
+        pid: number;
+        attempt: number;
+        turn?: number;
+      };
+      hasLock = true;
+      attempt = lock.attempt;
+      turn = lock.turn ?? 0;
+      alive = isAlive(lock.pid);
+    }
+  } catch {
+    // locks dir doesn't exist
+  }
+
+  if (!hasTokens && !hasLock) return undefined;
+
+  if (alive && !lastStatus) lastStatus = "running";
+  if (!lastStatus) lastStatus = "unknown";
+
+  const prSearchUrl = `https://github.com/${repo}/pulls?q=is:pr+${identifier}`;
+
+  return {
+    totalCost,
+    attempt,
+    turn,
+    alive,
+    lastStatus,
+    durationSeconds,
+    prSearchUrl,
+  };
 }
 
 const UPDATE_MUTATION = `
