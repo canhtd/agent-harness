@@ -199,7 +199,7 @@ export default function IssuesPage() {
                     )}
                   </div>
                 )}
-                {items.length === 0 && !showQuickCreate ? (
+                {items.length === 0 && !(col.key === "todo" && showQuickCreate) ? (
                   <p className="kanban-empty">No issues</p>
                 ) : (
                   items.map((issue) => (
