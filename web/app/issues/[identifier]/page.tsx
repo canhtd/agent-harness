@@ -77,6 +77,8 @@ export default function IssueDetailPage() {
   const descTextareaRef = useRef<HTMLTextAreaElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const priorityDropdownRef = useRef<HTMLDivElement>(null);
+  const titleSavingRef = useRef(false);
+  const descSavingRef = useRef(false);
 
   useEffect(() => {
     fetch(`/api/issues/${identifier}`)
@@ -125,22 +127,27 @@ export default function IssueDetailPage() {
   }
 
   async function saveTitle() {
+    if (titleSavingRef.current) return;
     if (!issue || titleDraft === issue.title) {
       setEditingTitle(false);
       return;
     }
+    titleSavingRef.current = true;
     setSavingTitle(true);
     setTitleError(false);
     const updated = await patchIssue({ title: titleDraft });
+    titleSavingRef.current = false;
     setSavingTitle(false);
     if (updated) {
       setIssue(updated);
       setEditingTitle(false);
     } else {
       setTitleError(true);
-      setTimeout(() => setTitleError(false), 1500);
       setTitleDraft(issue.title);
-      setEditingTitle(false);
+      setTimeout(() => {
+        setTitleError(false);
+        setEditingTitle(false);
+      }, 1500);
     }
   }
 
@@ -159,6 +166,7 @@ export default function IssueDetailPage() {
   }
 
   async function saveDesc() {
+    if (descSavingRef.current) return;
     if (!issue) {
       setEditingDesc(false);
       return;
@@ -168,18 +176,22 @@ export default function IssueDetailPage() {
       setEditingDesc(false);
       return;
     }
+    descSavingRef.current = true;
     setSavingDesc(true);
     setDescError(false);
     const updated = await patchIssue({ description: newVal });
+    descSavingRef.current = false;
     setSavingDesc(false);
     if (updated) {
       setIssue(updated);
       setEditingDesc(false);
     } else {
       setDescError(true);
-      setTimeout(() => setDescError(false), 1500);
       setDescDraft(issue.description ?? "");
-      setEditingDesc(false);
+      setTimeout(() => {
+        setDescError(false);
+        setEditingDesc(false);
+      }, 1500);
     }
   }
 
