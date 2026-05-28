@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { IssueCard } from "../api/issues/route";
 
 const COLUMNS = [
@@ -94,11 +95,10 @@ export default function IssuesPage() {
                   <p className="kanban-empty">No issues</p>
                 ) : (
                   items.map((issue) => (
-                    <button
+                    <Link
                       key={issue.id}
+                      href={`/issues/${issue.identifier}`}
                       className="kanban-card"
-                      type="button"
-                      onClick={() => window.open(issue.url, "_blank")}
                     >
                       {issue.priority > 0 && (
                         <span
@@ -107,7 +107,7 @@ export default function IssuesPage() {
                       )}
                       <span className="kanban-id">{issue.identifier}</span>
                       <span className="kanban-title">{issue.title}</span>
-                    </button>
+                    </Link>
                   ))
                 )}
               </div>
