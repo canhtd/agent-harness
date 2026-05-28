@@ -57,13 +57,13 @@ export default function IssueDetailPage() {
       const res = await fetch(`/api/issues/${identifier}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
+        body: JSON.stringify({ ...fields, issueId: issue?.id }),
       });
       const data = await res.json();
       if (!res.ok || data.error) return null;
       return data.issue;
     },
-    [identifier],
+    [identifier, issue?.id],
   );
 
   function startEditTitle() {

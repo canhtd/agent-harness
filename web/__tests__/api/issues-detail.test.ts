@@ -189,6 +189,27 @@ describe("PATCH /api/issues/[identifier]", () => {
     });
   });
 
+  it("skips lookup when issueId is provided in body", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: { issueUpdate: { success: true, issue: UPDATED_NODE } },
+      }),
+    });
+
+    const res = await PATCH(
+      makeRequest({ title: "Updated title", issueId: "issue-1" }),
+      makeParams("ENG-55"),
+    );
+    expect(res.status).toBe(200);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.query).toContain("issueUpdate");
+    expect(body.variables.id).toBe("issue-1");
+    expect(body.variables.input).toEqual({ title: "Updated title" });
+  });
+
   it("returns 400 for invalid identifier", async () => {
     const res = await PATCH(makeRequest({ title: "x" }), makeParams("bad"));
     expect(res.status).toBe(400);

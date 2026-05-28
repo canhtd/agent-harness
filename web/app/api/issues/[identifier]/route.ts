@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { linearFetch } from "../../linear-fetch";
 
 export interface AgentMeta {
   totalCost: number;
@@ -95,19 +96,12 @@ export async function GET(
   };
 
   try {
-    const res = await fetch("https://api.linear.app/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: apiKey,
+    const res = await linearFetch(apiKey, {
+      query: QUERY,
+      variables: {
+        teamKey: parsed.teamKey,
+        number: parsed.number,
       },
-      body: JSON.stringify({
-        query: QUERY,
-        variables: {
-          teamKey: parsed.teamKey,
-          number: parsed.number,
-        },
-      }),
     });
     if (!res.ok) {
       return NextResponse.json(
@@ -329,50 +323,39 @@ export async function PATCH(
     );
   }
 
-  // Resolve issue ID from identifier
   let issueId: string;
-  try {
-    const lookupRes = await fetch("https://api.linear.app/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: apiKey,
-      },
-      body: JSON.stringify({
+  if (typeof body.issueId === "string" && body.issueId) {
+    issueId = body.issueId;
+  } else {
+    try {
+      const lookupRes = await linearFetch(apiKey, {
         query: QUERY,
         variables: { teamKey: parsed.teamKey, number: parsed.number },
-      }),
-    });
-    if (!lookupRes.ok) {
+      });
+      if (!lookupRes.ok) {
+        return NextResponse.json(
+          { error: `Linear API returned ${lookupRes.status}` },
+          { status: 502 },
+        );
+      }
+      const lookupData = await lookupRes.json();
+      const node = lookupData.data?.issues?.nodes?.[0];
+      if (!node) {
+        return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+      }
+      issueId = node.id;
+    } catch {
       return NextResponse.json(
-        { error: `Linear API returned ${lookupRes.status}` },
+        { error: "Failed to reach Linear API" },
         { status: 502 },
       );
     }
-    const lookupData = await lookupRes.json();
-    const node = lookupData.data?.issues?.nodes?.[0];
-    if (!node) {
-      return NextResponse.json({ error: "Issue not found" }, { status: 404 });
-    }
-    issueId = node.id;
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to reach Linear API" },
-      { status: 502 },
-    );
   }
 
   try {
-    const res = await fetch("https://api.linear.app/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: apiKey,
-      },
-      body: JSON.stringify({
-        query: UPDATE_MUTATION,
-        variables: { id: issueId, input },
-      }),
+    const res = await linearFetch(apiKey, {
+      query: UPDATE_MUTATION,
+      variables: { id: issueId, input },
     });
     if (!res.ok) {
       return NextResponse.json(
