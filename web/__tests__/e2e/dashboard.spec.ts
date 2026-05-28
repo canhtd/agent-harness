@@ -12,16 +12,16 @@ test("renders all 5 metric cards", async ({ page }) => {
   const cards = page.locator(".card");
   await expect(cards).toHaveCount(5);
 
-  await expect(page.getByText("Running agents")).toBeVisible();
-  await expect(page.getByText("Blocked / Failed")).toBeVisible();
-  await expect(page.getByText("Success rate")).toBeVisible();
-  await expect(page.getByText("Avg duration")).toBeVisible();
-  await expect(page.getByText("Total cost")).toBeVisible();
+  await expect(cards.nth(0)).toContainText("Running agents");
+  await expect(cards.nth(1)).toContainText("Blocked");
+  await expect(cards.nth(2)).toContainText("Success rate");
+  await expect(cards.nth(3)).toContainText("Avg duration");
+  await expect(cards.nth(4)).toContainText("Total cost");
 
-  await expect(page.locator(".card-value").nth(0)).toHaveText("2");
-  await expect(page.locator(".card-value").nth(1)).toHaveText("0");
-  await expect(page.locator(".card-value").nth(2)).toHaveText("85%");
-  await expect(page.locator(".card-value").nth(4)).toHaveText("$45.50");
+  await expect(cards.nth(0).locator(".card-value")).toHaveText("2");
+  await expect(cards.nth(1).locator(".card-value")).toHaveText("0");
+  await expect(cards.nth(2).locator(".card-value")).toHaveText("85%");
+  await expect(cards.nth(4).locator(".card-value")).toHaveText("$45.50");
 });
 
 test("renders sessions table with rows", async ({ page }) => {
@@ -30,14 +30,14 @@ test("renders sessions table with rows", async ({ page }) => {
   await expect(table).toBeVisible();
   const rows = page.locator(".table-row");
   await expect(rows).toHaveCount(1);
-  await expect(page.getByText("ENG-55")).toBeVisible();
+  await expect(rows.first()).toContainText("ENG-55");
 });
 
 test("sidebar navigation links present", async ({ page }) => {
   await page.goto("/");
   const sidebar = page.locator(".sidebar");
   await expect(sidebar).toBeVisible();
-  await expect(sidebar.getByText("Dashboard")).toBeVisible();
-  await expect(sidebar.getByText("Tokens")).toBeVisible();
-  await expect(sidebar.getByText("Issues")).toBeVisible();
+  await expect(sidebar).toContainText("Dashboard");
+  await expect(sidebar).toContainText("Tokens");
+  await expect(sidebar).toContainText("Issues");
 });
