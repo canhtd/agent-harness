@@ -922,3 +922,25 @@ body {
   0% { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.5); }
   100% { box-shadow: none; }
 }
+
+/* Agent metadata section */
+
+.detail-agent-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.detail-agent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.detail-cost {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}

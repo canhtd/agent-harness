@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import type { IssueDetail } from "../../api/issues/[identifier]/route";
+import type { IssueDetail, AgentMeta } from "../../api/issues/[identifier]/route";
 import type { WorkflowState } from "../../api/issues/states/route";
 
 const PRIORITY_LABELS: Record<number, string> = {
@@ -21,6 +21,31 @@ const PRIORITY_OPTIONS = [
   { value: 3, label: "Medium" },
   { value: 4, label: "Low" },
 ];
+
+function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "—";
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  }
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}m ${s}s`;
+}
+
+function costColor(cost: number): string {
+  if (cost < 20) return "var(--color-cost-green)";
+  if (cost < 50) return "var(--color-cost-yellow)";
+  return "var(--color-cost-red)";
+}
+
+function statusBadgeClass(meta: AgentMeta): string {
+  if (meta.alive) return "status-badge status-completed";
+  if (meta.lastStatus === "completed") return "status-badge status-completed";
+  if (meta.lastStatus === "failed") return "status-badge status-failed";
+  return "status-badge status-unknown";
+}
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -422,6 +447,49 @@ export default function IssueDetailPage() {
               {relativeTime(issue.updatedAt)}
             </span>
           </div>
+          {issue.agentMeta && (
+            <div className="detail-agent-section">
+              <span className="detail-meta-label">Agent</span>
+              <div className="detail-agent-row">
+                <span className="text-muted">Status</span>
+                <span className={statusBadgeClass(issue.agentMeta)}>
+                  {issue.agentMeta.alive ? "running" : issue.agentMeta.lastStatus}
+                </span>
+              </div>
+              <div className="detail-agent-row">
+                <span className="text-muted">Cost</span>
+                <span
+                  className="detail-cost"
+                  style={{ color: costColor(issue.agentMeta.totalCost) }}
+                >
+                  ${issue.agentMeta.totalCost.toFixed(2)}
+                </span>
+              </div>
+              <div className="detail-agent-row">
+                <span className="text-muted">Attempt / Turn</span>
+                <span className="detail-meta-value">
+                  Attempt {issue.agentMeta.attempt} / Turn {issue.agentMeta.turn}
+                </span>
+              </div>
+              <div className="detail-agent-row">
+                <span className="text-muted">Duration</span>
+                <span className="detail-meta-value">
+                  {formatDuration(issue.agentMeta.durationSeconds)}
+                </span>
+              </div>
+              <div className="detail-agent-row">
+                <span className="text-muted">PR</span>
+                <a
+                  href={issue.agentMeta.prSearchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="detail-linear-link"
+                >
+                  View PR →
+                </a>
+              </div>
+            </div>
+          )}
           <a
             href={issue.url}
             target="_blank"
