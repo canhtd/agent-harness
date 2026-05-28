@@ -152,6 +152,7 @@ export default function IssueDetailPage() {
   }
 
   function cancelEditTitle() {
+    if (issue) setTitleDraft(issue.title);
     setEditingTitle(false);
     setTitleError(false);
   }
@@ -196,6 +197,7 @@ export default function IssueDetailPage() {
   }
 
   function cancelEditDesc() {
+    setDescDraft(issue?.description ?? "");
     setEditingDesc(false);
     setDescError(false);
   }

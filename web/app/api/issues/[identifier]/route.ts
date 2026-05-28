@@ -155,7 +155,7 @@ export async function PATCH(
     );
   }
 
-  let body: { title?: string; description?: string; priority?: number; stateId?: string };
+  let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
@@ -163,10 +163,30 @@ export async function PATCH(
   }
 
   const input: Record<string, unknown> = {};
-  if (body.title !== undefined) input.title = body.title;
-  if (body.description !== undefined) input.description = body.description;
-  if (body.priority !== undefined) input.priority = body.priority;
-  if (body.stateId !== undefined) input.stateId = body.stateId;
+  if (body.title !== undefined) {
+    if (typeof body.title !== "string") {
+      return NextResponse.json({ error: "title must be a string" }, { status: 400 });
+    }
+    input.title = body.title;
+  }
+  if (body.description !== undefined) {
+    if (typeof body.description !== "string") {
+      return NextResponse.json({ error: "description must be a string" }, { status: 400 });
+    }
+    input.description = body.description;
+  }
+  if (body.priority !== undefined) {
+    if (typeof body.priority !== "number") {
+      return NextResponse.json({ error: "priority must be a number" }, { status: 400 });
+    }
+    input.priority = body.priority;
+  }
+  if (body.stateId !== undefined) {
+    if (typeof body.stateId !== "string") {
+      return NextResponse.json({ error: "stateId must be a string" }, { status: 400 });
+    }
+    input.stateId = body.stateId;
+  }
 
   if (Object.keys(input).length === 0) {
     return NextResponse.json(
