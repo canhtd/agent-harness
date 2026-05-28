@@ -157,7 +157,11 @@ export async function PATCH(
 
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    const parsed = await request.json();
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 });
+    }
+    body = parsed;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -176,8 +180,8 @@ export async function PATCH(
     input.description = body.description;
   }
   if (body.priority !== undefined) {
-    if (typeof body.priority !== "number") {
-      return NextResponse.json({ error: "priority must be a number" }, { status: 400 });
+    if (typeof body.priority !== "number" || !Number.isInteger(body.priority) || body.priority < 0 || body.priority > 4) {
+      return NextResponse.json({ error: "priority must be an integer 0-4" }, { status: 400 });
     }
     input.priority = body.priority;
   }
