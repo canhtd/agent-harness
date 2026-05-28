@@ -1,97 +1,96 @@
 # Gotchas
 
-Lỗi đã gặp trong quá trình build. Đọc trước khi làm bất kỳ task nào.
+Known pitfalls from prior work. Read before starting any task.
 
-## Blocked issues được filter qua inverseRelations
+## Blocked issues are filtered via inverseRelations
 
-`fetchCandidates()` check `inverseRelations` (type `blocks`) cho mỗi issue. Nếu bất kỳ blocker nào chưa ở terminal state (Done, Canceled, Duplicate), issue bị skip. Log entry: `issue blocked` kèm blocker identifiers. Fixed: ENG-3.
+`fetchCandidates()` checks `inverseRelations` (type `blocks`) for each issue. If any blocker is not in a terminal state (Done, Canceled, Duplicate), the issue is skipped. Log entry: `issue blocked` with blocker identifiers. Fixed: ENG-3.
 
-## Nhiều agents sửa cùng file = merge conflict
+## Multiple agents editing the same file = merge conflict
 
-Nếu dispatch nhiều issues cùng lúc và tất cả sửa `src/index.ts`, worktrees sẽ conflict khi merge. Phải tách modules trước (ENG-8) rồi mới dispatch song song. Rule: không dispatch nhiều issues cùng sửa 1 file.
+Dispatching multiple issues simultaneously that all modify `src/index.ts` causes worktree merge conflicts. Extract modules first (ENG-8) before parallel dispatch. Rule: do not dispatch multiple issues that modify the same file.
 
 ## Linear project ≠ team
 
-Linear project = epic (tạm thời, có deadline). Team = đơn vị tổ chức chính. Orchestrator filter theo `LINEAR_TEAM_KEY`, không phải project slug. Project slug là optional scope.
+Linear project = epic (temporary, has deadline). Team = primary organizational unit. Orchestrator filters by `LINEAR_TEAM_KEY`, not project slug. Project slug is optional scope.
 
-## spawn stdio cần file descriptor, không phải WriteStream
+## spawn stdio requires file descriptor, not WriteStream
 
-`child_process.spawn` với `detached: true` không chấp nhận `createWriteStream()` làm stdio. Dùng `openSync()` trả về fd (number) thay thế.
+`child_process.spawn` with `detached: true` does not accept `createWriteStream()` for stdio. Use `openSync()` which returns an fd (number) instead.
 
-## Stale branch khi tạo worktree
+## Stale branch when creating worktree
 
-`git worktree add -b "agent/X"` fail nếu branch đã tồn tại từ lần chạy trước. Fix: `git branch -D` trước khi tạo worktree mới.
+`git worktree add -b "agent/X"` fails if the branch already exists from a previous run. Fix: `git branch -D` before creating a new worktree.
 
-## Agent dừng lại hỏi thay vì tự làm
+## Agent stops to ask instead of acting
 
-Claude Code ở `-p` mode không có TTY → nếu agent hỏi "shall I proceed?" sẽ không ai trả lời và task dừng. Prompt phải nói rõ: "You are running autonomously — do not ask for confirmation" và liệt kê đầy đủ steps.
+Claude Code in `-p` mode has no TTY — if the agent asks "shall I proceed?" nobody can respond and the task stalls. Prompt must explicitly state: "You are running autonomously — do not ask for confirmation" and list all steps.
 
-## Agent refactor không kế thừa local fixes
+## Agent refactor does not inherit local fixes
 
-Khi agent tách modules, nó dựa trên `origin/main` — không thấy fixes chưa commit trên local. Fixes phải merge vào main TRƯỚC khi agent tạo branch.
+When an agent extracts modules, it branches from `origin/main` — it cannot see uncommitted local fixes. Fixes must be merged into main BEFORE the agent creates its branch.
 
-## Branch protection chặn push trực tiếp lên main
+## Branch protection blocks direct push to main
 
-Mọi thay đổi phải qua PR + CI pass. Kể cả CI config fixes.
+All changes must go through a PR + CI pass. Including CI config fixes.
 
 ## pnpm approve-builds / --ignore-scripts
 
-CI cần `pnpm install --ignore-scripts` vì esbuild postinstall bị block. Local worktree cần `pnpm approve-builds esbuild`.
+CI needs `pnpm install --ignore-scripts` because esbuild postinstall is blocked. Local worktrees need `pnpm approve-builds esbuild`.
 
-## Stall detection và poll interval
+## Stall detection and poll interval
 
-Stall detection chạy mỗi tick. Với poll interval = 30s, detection latency tối đa 30s sau khi vượt stall timeout. Default: stall timeout = 600s, poll interval = 30s. Không cần stall timeout < poll interval — chỉ cần stall timeout đủ lớn để tránh false positive. Agent spawn dùng `--output-format stream-json` nên log file mtime update liên tục — stall detection hoạt động đúng trên mọi máy.
+Stall detection runs every tick. With poll interval = 30s, max detection latency is 30s after exceeding stall timeout. Default: stall timeout = 600s, poll interval = 30s. Stall timeout does not need to be < poll interval — it just needs to be large enough to avoid false positives. Agent spawn uses `--output-format stream-json` so log file mtime updates continuously — stall detection works correctly on all machines.
 
 ## Linear priority 0 = no priority
 
-Linear priority: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low. Priority 0 không phải cao nhất — nó nghĩa là chưa set. Dispatch ordering xếp 0 và null cuối cùng.
+Linear priority: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low. Priority 0 is not the highest — it means unset. Dispatch ordering places 0 and null last.
 
-## Branch name chứa issue identifier = Linear auto-close nhầm
+## Branch name containing issue identifier = Linear auto-close mismatch
 
-Linear GitHub integration detect issue identifier (ví dụ `ENG-13`) trong branch name. Nếu PR merge → Linear tự chuyển issue sang Done. Không đặt branch name chứa identifier của issue không liên quan. Branch `agent/ENG-13-test-framework` khiến ENG-13 bị close nhầm khi PR merge.
+Linear GitHub integration detects issue identifiers (e.g. `ENG-13`) in branch names. If a PR merges → Linear auto-transitions the issue to Done. Do not include an unrelated issue's identifier in a branch name. Branch `agent/ENG-13-test-framework` caused ENG-13 to be closed when the PR merged.
 
-## PR author và reviewer phải khác account
+## PR author and reviewer must be different accounts
 
-`review.ts` dùng `GITHUB_BOT_TOKEN` (account `duccanh88`) để post review. Nếu agent cũng tạo PR bằng `duccanh88` → GitHub reject "Can not approve your own pull request" → review stuck loop vô hạn.
+`review.ts` uses `GITHUB_BOT_TOKEN` (account `duccanh88`) to post reviews. If the agent also creates the PR as `duccanh88` → GitHub rejects with "Can not approve your own pull request" → review gets stuck in an infinite loop.
 
-Nguyên nhân: agent inherit `GITHUB_BOT_TOKEN` từ orchestrator env. Khi `gh` CLI chưa auth, agent có thể dùng bot token để tạo PR → cùng account với reviewer.
+Root cause: agent inherits `GITHUB_BOT_TOKEN` from orchestrator env. When `gh` CLI is not authenticated, the agent may use the bot token to create the PR → same account as the reviewer.
 
-Fix: đảm bảo `gh auth login` trên máy chạy orchestrator dùng account chính (`canhtd`), không phải bot account. Agent tạo PR bằng `canhtd`, review bằng `duccanh88`.
+Fix: ensure `gh auth login` on the orchestrator machine uses the primary account (`canhtd`), not the bot account. Agent creates PR as `canhtd`, review is posted as `duccanh88`.
 
-## claude -p không stream stdout
+## claude -p does not stream stdout
 
-`claude -p` chỉ ghi stdout khi hoàn thành toàn bộ task. Trong lúc chạy (edit files, install deps, run commands), stdout = 0 bytes → log file mtime không update → stall detection false positive.
+`claude -p` only writes to stdout when the entire task completes. During execution (editing files, installing deps, running commands), stdout = 0 bytes → log file mtime does not update → stall detection false positive.
 
-Fix: dùng `--output-format stream-json` để Claude CLI stream từng message ra stdout realtime. Nếu chưa apply, tăng `STALL_TIMEOUT_MS` đủ lớn (600s+) để agent có thời gian hoàn thành.
+Fix: use `--output-format stream-json` so Claude CLI streams each message to stdout in realtime. If not applied, increase `STALL_TIMEOUT_MS` to 600s+ to give the agent enough time to finish.
 
-## Ubuntu cold start chậm hơn Mac
+## Ubuntu cold start is slower than Mac
 
-Máy mới clone cần install dependencies, MCP servers (Playwright ~270MB) lần đầu. Agent mất nhiều thời gian hơn so với Mac đã có cache. Stall timeout phải đủ lớn cho cold start.
+A fresh clone needs to install dependencies and MCP servers (Playwright ~270MB) on first run. Agents take longer than on a Mac with warm cache. Stall timeout must be large enough for cold starts.
 
-## Reset issue cần xóa cả remote branch
+## Reset issue must also delete remote branch
 
-Khi close PR và reset worktree, phải xóa cả remote branch (`git push origin --delete agent/ENG-XX`). Nếu remote branch còn tồn tại với PR closed, agent mới sẽ thấy closed PR → confused → crash loop. Agent cần branch sạch để tạo PR mới.
+When closing a PR and resetting a worktree, the remote branch must also be deleted (`git push origin --delete agent/ENG-XX`). If the remote branch still exists with a closed PR, a new agent will see the closed PR → gets confused → crash loop. The agent needs a clean branch to create a new PR.
 
-## Stale rebase-merge trong worktree
+## Stale rebase-merge in worktree
 
-Khi agent bị kill giữa chừng `git rebase`, worktree giữ lại `rebase-merge` directory. Hook `before_run` chạy `git rebase origin/main` fail mãi với "It seems that there is already a rebase-merge directory". Fix: `rm -rf .git/worktrees/{IDENTIFIER}/rebase-merge` hoặc xóa worktree rồi tạo lại.
+When an agent is killed mid-`git rebase`, the worktree retains a `rebase-merge` directory. The `before_run` hook running `git rebase origin/main` keeps failing with "It seems that there is already a rebase-merge directory". Fix: `rm -rf .git/worktrees/{IDENTIFIER}/rebase-merge` or delete and recreate the worktree.
 
-## --output-format stream-json cần --verbose
+## --output-format stream-json requires --verbose
 
-`claude -p --output-format stream-json` crash với "requires --verbose". Phải luôn kèm `--verbose` flag. ENG-32 merge thiếu flag này → tất cả agent crash. Smoke test (`runner.smoke.test.ts`) sẽ bắt lỗi này — chạy `claude -p` thật với đúng flags trước commit.
+`claude -p --output-format stream-json` crashes with "requires --verbose". Must always include the `--verbose` flag. ENG-32 merged without this flag → all agents crashed. Smoke test (`runner.smoke.test.ts`) catches this — run `claude -p` with the exact flags before committing.
 
-## pullMainIfChanged phải reset --hard, không dùng --ff-only
+## pullMainIfChanged must use reset --hard, not --ff-only
 
-`src/index.ts` detect `origin/main` khác local main → pull → exit → systemd restart. Dùng `git reset --hard origin/main` thay vì `git merge --ff-only` vì:
-1. Nếu không pull trước khi exit → restart chạy code cũ → detect khác → exit → loop vô hạn (đã xảy ra 367 lần)
-2. `--ff-only` fail khi local main có commit chưa push (hotfix commit trên local + PR squash merge tạo hash khác → diverge → ff-only reject)
-3. Local main không bao giờ có local-only commits — agents làm việc trong worktree, mọi thay đổi qua PR. `reset --hard` an toàn.
+`src/index.ts` detects `origin/main` differs from local main → pull → exit → systemd restart. Use `git reset --hard origin/main` instead of `git merge --ff-only` because:
+1. If main is not pulled before exit → restart runs old code → detects diff → exits → infinite loop (happened 367 times)
+2. `--ff-only` fails when local main has unpushed commits (local hotfix commit + PR squash merge creates different hash → diverge → ff-only rejects)
+3. Local main never has local-only commits — agents work in worktrees, all changes go through PRs. `reset --hard` is safe.
 
 ## Systemd KillMode=control-group kills detached agents
 
-Systemd default `KillMode=control-group` kill toàn bộ cgroup khi restart, bao gồm agent processes dù đã `detached: true` + `child.unref()`. Orchestrator detect main updated → `process.exit(0)` → systemd restart → agents bị kill giữa chừng. Fix: `KillMode=process` trong service file — systemd chỉ kill main process (node), agents detached tiếp tục chạy.
+Systemd default `KillMode=control-group` kills the entire cgroup on restart, including agent processes despite `detached: true` + `child.unref()`. Orchestrator detects main updated → `process.exit(0)` → systemd restart → agents killed mid-task. Fix: `KillMode=process` in the service file — systemd only kills the main process (node), detached agents continue running.
 
-## Không code tay — tạo issue để agent tự build
+## Do not code by hand — create issues for agents to build
 
-Agent harness tự build chính nó (bootstrapping). Mọi feature/fix phải tạo Linear issue → orchestrator dispatch agent → agent implement. Không code tay rồi push trực tiếp. Chỉ code tay khi agent không thể tự làm (ví dụ: fix orchestrator đang broken không dispatch được).
-
+Agent harness builds itself (bootstrapping). All features/fixes must go through Linear issue → orchestrator dispatch → agent implements. Do not code by hand and push directly. Only code by hand when the agent cannot do it itself (e.g. fixing a broken orchestrator that cannot dispatch).

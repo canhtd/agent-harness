@@ -34,9 +34,9 @@ function parseFrontMatter(content: string): Record<string, string> {
 export async function loadHooksConfig(repoPath: string): Promise<HooksConfig> {
   let fm: Record<string, string> = {}
   try {
-    const raw = await fs.readFile(path.join(repoPath, 'WORKFLOW.md'), 'utf-8')
+    const raw = await fs.readFile(path.join(repoPath, 'PROMPT_DEFAULT.md'), 'utf-8')
     fm = parseFrontMatter(raw)
-  } catch { /* no WORKFLOW.md */ }
+  } catch { /* no PROMPT_DEFAULT.md */ }
 
   return {
     after_create: process.env.HOOK_AFTER_CREATE || fm.hook_after_create || undefined,
