@@ -28,7 +28,7 @@ export interface IssueDetail {
   agentMeta?: AgentMeta;
 }
 
-function parseIdentifier(identifier: string): { teamKey: string; number: number } | null {
+export function parseIdentifier(identifier: string): { teamKey: string; number: number } | null {
   const match = identifier.match(/^([A-Z]+)-(\d+)$/);
   if (!match) return null;
   return { teamKey: match[1], number: parseInt(match[2], 10) };
@@ -46,12 +46,6 @@ query($teamKey: String!, $number: Float!) {
     }
   }
 }`;
-
-function parseIdentifier(identifier: string): { teamKey: string; number: number } | null {
-  const match = identifier.match(/^([A-Z]+)-(\d+)$/);
-  if (!match) return null;
-  return { teamKey: match[1], number: parseInt(match[2], 10) };
-}
 
 export async function GET(
   _request: Request,
@@ -72,14 +66,6 @@ export async function GET(
     return NextResponse.json(
       { error: "LINEAR_API_KEY not set" },
       { status: 500 },
-    );
-  }
-
-  const parsed = parseIdentifier(identifier);
-  if (!parsed) {
-    return NextResponse.json(
-      { error: "Invalid identifier format (expected TEAM-123)" },
-      { status: 400 },
     );
   }
 
@@ -301,11 +287,11 @@ export async function PATCH(
 
   let body: Record<string, unknown>;
   try {
-    const parsed = await request.json();
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    const jsonBody = await request.json();
+    if (typeof jsonBody !== "object" || jsonBody === null || Array.isArray(jsonBody)) {
       return NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 });
     }
-    body = parsed;
+    body = jsonBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -339,14 +325,6 @@ export async function PATCH(
   if (Object.keys(input).length === 0) {
     return NextResponse.json(
       { error: "No valid fields to update" },
-      { status: 400 },
-    );
-  }
-
-  const parsed = parseIdentifier(identifier);
-  if (!parsed) {
-    return NextResponse.json(
-      { error: "Invalid identifier format (expected TEAM-123)" },
       { status: 400 },
     );
   }
