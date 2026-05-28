@@ -28,9 +28,15 @@ export interface IssueDetail {
   agentMeta?: AgentMeta;
 }
 
+function parseIdentifier(identifier: string): { teamKey: string; number: number } | null {
+  const match = identifier.match(/^([A-Z]+)-(\d+)$/);
+  if (!match) return null;
+  return { teamKey: match[1], number: parseInt(match[2], 10) };
+}
+
 const QUERY = `
-query($filter: IssueFilter!) {
-  issues(filter: $filter, first: 1) {
+query($teamKey: String!, $number: Float!) {
+  issues(filter: { number: { eq: $number }, team: { key: { eq: $teamKey } } }, first: 1) {
     nodes {
       id identifier title description priority url
       createdAt updatedAt
@@ -46,6 +52,14 @@ export async function GET(
   { params }: { params: Promise<{ identifier: string }> },
 ) {
   const { identifier } = await params;
+
+  const parsed = parseIdentifier(identifier);
+  if (!parsed) {
+    return NextResponse.json(
+      { error: "Invalid identifier format (expected TEAM-123)" },
+      { status: 400 },
+    );
+  }
 
   const apiKey = process.env.LINEAR_API_KEY;
   if (!apiKey) {
@@ -90,7 +104,8 @@ export async function GET(
       body: JSON.stringify({
         query: QUERY,
         variables: {
-          filter: { identifier: { eq: identifier } },
+          teamKey: parsed.teamKey,
+          number: parsed.number,
         },
       }),
     });
@@ -254,6 +269,14 @@ export async function PATCH(
 ) {
   const { identifier } = await params;
 
+  const parsed = parseIdentifier(identifier);
+  if (!parsed) {
+    return NextResponse.json(
+      { error: "Invalid identifier format (expected TEAM-123)" },
+      { status: 400 },
+    );
+  }
+
   const apiKey = process.env.LINEAR_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -317,7 +340,7 @@ export async function PATCH(
       },
       body: JSON.stringify({
         query: QUERY,
-        variables: { filter: { identifier: { eq: identifier } } },
+        variables: { teamKey: parsed.teamKey, number: parsed.number },
       }),
     });
     if (!lookupRes.ok) {
