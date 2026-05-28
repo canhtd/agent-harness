@@ -106,9 +106,10 @@ describe("linearFetch", () => {
       .mockRejectedValueOnce(new Error("network error"));
 
     const promise = linearFetch(API_KEY, BODY);
+    const assertion = expect(promise).rejects.toThrow("network error");
     await vi.advanceTimersByTimeAsync(1000);
+    await assertion;
 
-    await expect(promise).rejects.toThrow("network error");
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 

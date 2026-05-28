@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { linearFetch } from "../linear-fetch";
+import { linearFetch } from "../../linear-fetch";
 
 export interface AgentMeta {
   totalCost: number;

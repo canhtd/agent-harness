@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { linearFetch } from "../linear-fetch";
+import { linearFetch } from "../../linear-fetch";
 
 export interface WorkflowState {
   id: string;
