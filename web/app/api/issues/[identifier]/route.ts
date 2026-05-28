@@ -28,6 +28,12 @@ export interface IssueDetail {
   agentMeta?: AgentMeta;
 }
 
+function parseIdentifier(identifier: string): { teamKey: string; number: number } | null {
+  const match = identifier.match(/^([A-Z]+)-(\d+)$/);
+  if (!match) return null;
+  return { teamKey: match[1], number: parseInt(match[2], 10) };
+}
+
 const QUERY = `
 query($teamKey: String!, $number: Float!) {
   issues(filter: { number: { eq: $number }, team: { key: { eq: $teamKey } } }, first: 1) {
@@ -52,6 +58,14 @@ export async function GET(
   { params }: { params: Promise<{ identifier: string }> },
 ) {
   const { identifier } = await params;
+
+  const parsed = parseIdentifier(identifier);
+  if (!parsed) {
+    return NextResponse.json(
+      { error: "Invalid identifier format (expected TEAM-123)" },
+      { status: 400 },
+    );
+  }
 
   const apiKey = process.env.LINEAR_API_KEY;
   if (!apiKey) {
@@ -268,6 +282,14 @@ export async function PATCH(
   { params }: { params: Promise<{ identifier: string }> },
 ) {
   const { identifier } = await params;
+
+  const parsed = parseIdentifier(identifier);
+  if (!parsed) {
+    return NextResponse.json(
+      { error: "Invalid identifier format (expected TEAM-123)" },
+      { status: 400 },
+    );
+  }
 
   const apiKey = process.env.LINEAR_API_KEY;
   if (!apiKey) {
