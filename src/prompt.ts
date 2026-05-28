@@ -140,7 +140,7 @@ export async function buildPrompt(
   issue: IssueInfo,
   opts: { attempt?: number; repoPath: string },
 ): Promise<string> {
-  const templateFile = issue.stateName === 'Rework' ? 'WORKFLOW_REWORK.md' : 'WORKFLOW.md'
+  const templateFile = issue.stateName === 'Rework' ? 'PROMPT_REWORK.md' : 'PROMPT_DEFAULT.md'
   const fallback = issue.stateName === 'Rework' ? reworkPrompt : defaultPrompt
 
   let base: string
