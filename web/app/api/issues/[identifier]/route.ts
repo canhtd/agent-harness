@@ -223,6 +223,7 @@ async function gatherAgentMeta(
 
   if (!hasTokens && !hasLock) return undefined;
 
+  if (!alive && lastStatus === "running") lastStatus = "failed";
   if (alive && !lastStatus) lastStatus = "running";
   if (!lastStatus) lastStatus = "unknown";
 
