@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { GET } from "@/app/api/issues/states/route";
+import { GET, _resetStatesCache } from "@/app/api/issues/states/route";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -13,6 +13,7 @@ const STATE_NODES = [
 describe("GET /api/issues/states", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetStatesCache();
     process.env.LINEAR_API_KEY = "test-key";
     process.env.LINEAR_TEAM_KEY = "ENG";
   });
@@ -95,5 +96,45 @@ describe("GET /api/issues/states", () => {
 
     const res = await GET();
     expect(res.status).toBe(502);
+  });
+
+  it("returns cached states on second call without hitting API", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: { teams: { nodes: [{ states: { nodes: STATE_NODES } }] } },
+      }),
+    });
+
+    const res1 = await GET();
+    expect(res1.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    const res2 = await GET();
+    const data2 = await res2.json();
+    expect(res2.status).toBe(200);
+    expect(data2.states).toHaveLength(3);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes cache after TTL expires", async () => {
+    vi.useFakeTimers();
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: { teams: { nodes: [{ states: { nodes: STATE_NODES } }] } },
+      }),
+    });
+
+    await GET();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+    await GET();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
   });
 });
