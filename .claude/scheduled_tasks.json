@@ -1,9 +1,0 @@
-[
-  {
-    "name": "daily-babysit",
-    "schedule": "17 9 * * *",
-    "description": "Run full babysit checklist: orchestrator health, locks, worktrees, branches, Linear state, stale PRs",
-    "prompt": "/babysit",
-    "enabled": true
-  }
-]
