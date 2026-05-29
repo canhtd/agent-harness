@@ -2295,6 +2295,52 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* PR state banners */
+
+.review-merged-banner,
+.review-closed-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.review-merged-banner {
+  background: color-mix(in srgb, #8957e5 8%, transparent);
+  border: 1px solid color-mix(in srgb, #8957e5 20%, transparent);
+  color: var(--color-ink);
+}
+
+.review-closed-banner {
+  background: color-mix(in srgb, var(--color-muted) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-muted) 20%, transparent);
+  color: var(--color-ink);
+}
+
+.review-state-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.review-state-badge-merged {
+  background: #8957e5;
+  color: #fff;
+}
+
+.review-state-badge-closed {
+  background: var(--color-muted);
+  color: #fff;
+}
+
 /* Diff empty state */
 
 .diff-empty {
