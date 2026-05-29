@@ -101,6 +101,10 @@ export default function CycleDetailPage() {
           {cycle.team.name}
         </Link>
         <span className="cycle-detail-breadcrumb-sep">/</span>
+        <Link href={`/teams/${teamId}`} className="cycle-detail-breadcrumb-link">
+          Cycles
+        </Link>
+        <span className="cycle-detail-breadcrumb-sep">/</span>
         <span className="cycle-detail-breadcrumb-current">{cycleName}</span>
       </nav>
 
