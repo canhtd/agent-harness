@@ -8,3 +8,6 @@ ExecStart=%h/projects/agent-harness/scripts/babysit.sh
 WorkingDirectory=%h/projects/agent-harness
 StandardOutput=append:%h/.agent-harness/logs/babysit.log
 StandardError=append:%h/.agent-harness/logs/babysit.log
+
+[Install]
+WantedBy=default.target
