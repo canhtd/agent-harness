@@ -17,16 +17,24 @@ export interface ReviewCard {
   createdAt: string;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { stdout } = await execFileAsync("gh", [
+    const { searchParams } = new URL(request.url);
+    const state = searchParams.get("state") || "open";
+
+    const args = [
       "pr",
       "list",
       "--state",
-      "open",
+      state === "all" ? "all" : state === "merged" ? "merged" : "open",
       "--json",
       "number,title,state,createdAt,updatedAt,headRefName,baseRefName,author,reviewDecision,additions,deletions,changedFiles",
-    ]);
+    ];
+    if (state === "all") {
+      args.push("--limit", "50");
+    }
+
+    const { stdout } = await execFileAsync("gh", args);
 
     const raw = JSON.parse(stdout) as Array<{
       number: number;
