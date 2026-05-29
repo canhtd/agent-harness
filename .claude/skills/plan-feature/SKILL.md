@@ -85,6 +85,7 @@ Title: [ngắn, rõ action — dưới 70 ký tự]
 - Có cycle trong dependency graph? Sửa lại ordering.
 - Có 2 issues sửa cùng file? Cảnh báo — dispatch song song sẽ conflict.
 - Mỗi acceptance criterion có verify được bằng command không? Nếu không, viết lại.
+- User flow coverage: cho mỗi page/feature, liệt kê 3 user flows chính (happy path, edge case, adjacent use case). Nếu issue description chỉ cover 1 flow, mở rộng scope hoặc tạo follow-up issue.
 
 ## Bước 3: Review với user
 
