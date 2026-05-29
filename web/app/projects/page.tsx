@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectCard } from "../api/projects/route";
+import { ProjectListSkeleton } from "./ProjectListSkeleton";
+import { ProjectRow } from "./ProjectRow";
 
 const STATUS_OPTIONS = [
   "All",
@@ -20,27 +22,6 @@ const STATUS_LABELS: Record<string, string> = {
   canceled: "Canceled",
   backlog: "Backlog",
 };
-
-const STATUS_COLORS: Record<string, string> = {
-  planned: "#6b7280",
-  started: "#2563eb",
-  paused: "#f59e0b",
-  completed: "#16a34a",
-  canceled: "#ef4444",
-  backlog: "#9ca3af",
-};
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function formatShortDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectCard[]>([]);
@@ -103,28 +84,7 @@ export default function ProjectsPage() {
     });
   }, [projects, filterStatus, filterLead, filterDateFrom, filterDateTo]);
 
-  if (loading) {
-    return (
-      <main className="page">
-        <div className="project-filter-bar">
-          <div className="skeleton-line" style={{ width: "120px", height: "32px" }} />
-          <div className="skeleton-line" style={{ width: "120px", height: "32px" }} />
-          <div className="skeleton-line" style={{ width: "120px", height: "32px" }} />
-          <div className="skeleton-line" style={{ width: "120px", height: "32px" }} />
-        </div>
-        <div className="project-list">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="project-row project-row-skeleton">
-              <div className="skeleton-line skeleton-short" />
-              <div className="skeleton-line skeleton-long" />
-              <div className="skeleton-line" style={{ width: "60px" }} />
-              <div className="skeleton-line" style={{ width: "100px" }} />
-            </div>
-          ))}
-        </div>
-      </main>
-    );
-  }
+  if (loading) return <ProjectListSkeleton />;
 
   return (
     <main className="page">
@@ -193,73 +153,9 @@ export default function ProjectsPage() {
         <div className="empty-state">No projects match the current filters</div>
       ) : (
         <div className="project-list">
-          {filtered.map((project) => {
-            const statusColor = STATUS_COLORS[project.state.toLowerCase()] ?? "#6b7280";
-            const statusLabel = STATUS_LABELS[project.state.toLowerCase()] ?? project.state;
-            return (
-              <div key={project.id} className="project-row">
-                <div className="project-row-icon">
-                  <span
-                    className="project-color-dot"
-                    style={{ background: project.color ?? statusColor }}
-                  />
-                  {project.icon && <span className="project-icon">{project.icon}</span>}
-                </div>
-
-                <div className="project-row-name">{project.name}</div>
-
-                <span
-                  className="project-status-badge"
-                  style={{
-                    background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
-                    color: statusColor,
-                  }}
-                >
-                  {statusLabel}
-                </span>
-
-                <div className="project-progress-cell">
-                  <div className="project-progress-bar">
-                    <div
-                      className="project-progress-fill"
-                      style={{
-                        width: `${Math.round(project.progress * 100)}%`,
-                        background: statusColor,
-                      }}
-                    />
-                  </div>
-                  <span className="project-progress-text">
-                    {Math.round(project.progress * 100)}%
-                  </span>
-                </div>
-
-                <div className="project-row-lead">
-                  {project.lead ? (
-                    <>
-                      {project.lead.avatarUrl ? (
-                        <img
-                          className="project-lead-avatar"
-                          src={project.lead.avatarUrl}
-                          alt={project.lead.displayName}
-                        />
-                      ) : (
-                        <span className="project-lead-avatar-placeholder">
-                          {project.lead.displayName.charAt(0)}
-                        </span>
-                      )}
-                      <span className="project-lead-name">{project.lead.displayName}</span>
-                    </>
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </div>
-
-                <div className="project-row-dates">
-                  {formatShortDate(project.startDate)} → {formatShortDate(project.targetDate)}
-                </div>
-              </div>
-            );
-          })}
+          {filtered.map((project) => (
+            <ProjectRow key={project.id} project={project} />
+          ))}
         </div>
       )}
     </main>
