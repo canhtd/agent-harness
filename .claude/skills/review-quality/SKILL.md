@@ -32,6 +32,17 @@ Output: `[pattern-incomplete] Fixed <pattern> in <file> but similar pattern appe
 
 Advisory only — do NOT REQUEST_CHANGES for this.
 
+### Deployment Files
+
+When the diff contains systemd units (`.service`/`.timer`), Dockerfiles, CI workflow files (`.github/workflows/`), deploy scripts, or infrastructure config:
+
+- Verify the file includes all required sections (e.g. a systemd `.service` file must have an `[Install]` section, a `.timer` must have an `[Install]` section with `WantedBy=`)
+- Check whether the diff or issue description includes an install/enable/deploy step. If a deployment file is created but nothing installs, enables, or activates it, flag it.
+
+Output: `[deployment-gap] <filename> created but no install/enable step`
+
+REQUEST_CHANGES.
+
 ## Out of Scope
 
 - Security (separate reviewer handles this)
