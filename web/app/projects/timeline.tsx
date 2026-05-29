@@ -73,7 +73,7 @@ export function Timeline({ projects }: TimelineProps) {
       cursor = addMonths(cursor, 1);
     }
 
-    return { rangeStart, rangeEnd, totalDays, months };
+    return { rangeStart, totalDays, months };
   }, [projects]);
 
   const todayOffset = useMemo(() => {
@@ -83,11 +83,27 @@ export function Timeline({ projects }: TimelineProps) {
   }, [rangeStart, totalDays]);
 
   function getBarPosition(project: ProjectCard) {
-    const fallbackStart = project.targetDate ?? new Date().toISOString().slice(0, 10);
-    const fallbackEnd = project.startDate ?? new Date().toISOString().slice(0, 10);
+    const MIN_SPAN_DAYS = 30;
+    const todayStr = new Date().toISOString().slice(0, 10);
 
-    const start = new Date((project.startDate ?? fallbackStart) + "T00:00:00");
-    const end = new Date((project.targetDate ?? fallbackEnd) + "T00:00:00");
+    let startStr = project.startDate;
+    let endStr = project.targetDate;
+
+    if (startStr && !endStr) {
+      const d = new Date(startStr + "T00:00:00");
+      d.setDate(d.getDate() + MIN_SPAN_DAYS);
+      endStr = d.toISOString().slice(0, 10);
+    } else if (!startStr && endStr) {
+      const d = new Date(endStr + "T00:00:00");
+      d.setDate(d.getDate() - MIN_SPAN_DAYS);
+      startStr = d.toISOString().slice(0, 10);
+    } else if (!startStr && !endStr) {
+      startStr = todayStr;
+      endStr = todayStr;
+    }
+
+    const start = new Date(startStr + "T00:00:00");
+    const end = new Date(endStr + "T00:00:00");
 
     const leftPct = daysBetween(rangeStart, start) / totalDays;
     const widthPct = Math.max(daysBetween(start, end) / totalDays, 0.005);
@@ -134,6 +150,8 @@ export function Timeline({ projects }: TimelineProps) {
             const color = getBarColor(project);
             const progressPct = Math.round(project.progress * 100);
             const hasNoDates = !project.startDate && !project.targetDate;
+            const hasSingleDate = (!project.startDate) !== (!project.targetDate);
+            const isPartial = hasNoDates || hasSingleDate;
 
             return (
               <div key={project.id} className="timeline-row">
@@ -166,11 +184,12 @@ export function Timeline({ projects }: TimelineProps) {
                     />
                   ) : (
                     <div
-                      className="timeline-bar"
+                      className={`timeline-bar ${isPartial ? "timeline-bar-no-dates" : ""}`}
                       style={{
                         left: pos.left,
                         width: pos.width,
-                        background: `color-mix(in srgb, ${color} 20%, transparent)`,
+                        background: `color-mix(in srgb, ${color} ${isPartial ? 15 : 20}%, transparent)`,
+                        borderLeft: isPartial ? `2px dashed ${color}` : undefined,
                       }}
                       onMouseEnter={(e) =>
                         setTooltip({ project, x: e.clientX, y: e.clientY })
