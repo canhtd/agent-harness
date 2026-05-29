@@ -80,7 +80,7 @@ export default function DashboardPage() {
       <div className="cards-grid">
         <div className="card">
           <span className="card-label">Running agents</span>
-          <span className="card-value" style={{ color: "var(--color-accent)" }}>
+          <span className="card-value" style={{ color: "var(--accent)" }}>
             {data.running}
           </span>
         </div>
