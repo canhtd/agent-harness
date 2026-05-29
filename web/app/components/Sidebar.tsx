@@ -47,6 +47,18 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/teams",
+    label: "Teams",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="6" cy="5.5" r="2" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M2 12.5c0-2 1.5-3.5 4-3.5s4 1.5 4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="11" cy="5" r="1.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M11 8.5c1.5 0 3 1 3 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar() {

@@ -1333,3 +1333,138 @@ body {
 .timeline-tooltip-meta {
   color: rgba(255, 255, 255, 0.75);
 }
+
+/* Teams list */
+
+.team-list {
+  background: var(--color-card);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.team-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.1s;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.team-row:last-child {
+  border-bottom: none;
+}
+
+.team-row:hover {
+  background: var(--color-row-alt);
+}
+
+.team-row-skeleton {
+  pointer-events: none;
+  cursor: default;
+}
+
+.team-row-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.team-color-dot {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 0.1875rem;
+  flex-shrink: 0;
+}
+
+.team-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.team-row-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.team-row-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-row-key {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.team-row-members {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.team-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.team-avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  object-fit: cover;
+  border: 2px solid var(--color-card);
+  margin-left: -0.375rem;
+  flex-shrink: 0;
+}
+
+.team-avatar:first-child {
+  margin-left: 0;
+}
+
+.team-avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 2px solid var(--color-card);
+  margin-left: -0.375rem;
+  flex-shrink: 0;
+}
+
+.team-avatar-placeholder:first-child {
+  margin-left: 0;
+}
+
+.team-member-count {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
