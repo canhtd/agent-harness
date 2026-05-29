@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import ReactDiffViewer from "react-diff-viewer-continued";
+import { useDarkMode } from "../hooks/use-dark-mode";
 
 function parsePatch(patch: string): { oldValue: string; newValue: string } {
   if (!patch) return { oldValue: "", newValue: "" };
@@ -69,27 +69,6 @@ const darkVars = {
   codeFoldContentColor: "#6b6f76",
   emptyLineBackground: "#1a1a1c",
 };
-
-function useDarkMode(): boolean {
-  const [isDark, setIsDark] = useState(true);
-
-  useEffect(() => {
-    const check = () => {
-      const theme = document.documentElement.getAttribute("data-theme");
-      setIsDark(theme !== "light");
-    };
-    check();
-
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  return isDark;
-}
 
 interface DiffViewerProps {
   patch: string;

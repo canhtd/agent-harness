@@ -2465,14 +2465,14 @@ body {
 }
 
 .review-merged-banner {
-  background: color-mix(in srgb, #8957e5 8%, transparent);
-  border: 1px solid color-mix(in srgb, #8957e5 20%, transparent);
+  background: color-mix(in srgb, #8957e5 8%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, #8957e5 20%, var(--bg-elevated));
   color: var(--text-primary);
 }
 
 .review-closed-banner {
-  background: color-mix(in srgb, var(--text-quaternary) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-quaternary) 20%, transparent);
+  background: color-mix(in srgb, var(--text-quaternary) 8%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--text-quaternary) 20%, var(--bg-elevated));
   color: var(--text-primary);
 }
 
