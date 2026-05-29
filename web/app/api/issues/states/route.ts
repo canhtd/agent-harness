@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { linearFetch } from "../../linear-fetch";
+import { readStatesCache, writeStatesCache } from "./cache";
 
 export interface WorkflowState {
   id: string;
@@ -21,15 +22,11 @@ query($teamKey: String!) {
 }`;
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-let statesCache: { states: WorkflowState[]; expiresAt: number } | null = null;
-
-export function _resetStatesCache() {
-  statesCache = null;
-}
 
 export async function GET() {
-  if (statesCache && Date.now() < statesCache.expiresAt) {
-    return NextResponse.json({ states: statesCache.states });
+  const cached = readStatesCache();
+  if (cached && Date.now() < cached.expiresAt) {
+    return NextResponse.json({ states: cached.states });
   }
 
   const apiKey = process.env.LINEAR_API_KEY;
@@ -71,7 +68,7 @@ export async function GET() {
       .slice()
       .sort((a: WorkflowState, b: WorkflowState) => a.position - b.position);
 
-    statesCache = { states, expiresAt: Date.now() + CACHE_TTL_MS };
+    writeStatesCache(states, Date.now() + CACHE_TTL_MS);
 
     return NextResponse.json({ states });
   } catch {

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { linearFetch } from "../../linear-fetch";
+import { parseIdentifier } from "./parse-identifier";
 
 export interface AgentMeta {
   totalCost: number;
@@ -27,12 +28,6 @@ export interface IssueDetail {
   labels: Array<{ id: string; name: string; color: string }>;
   assignee: { id: string; displayName: string; avatarUrl: string } | null;
   agentMeta?: AgentMeta;
-}
-
-export function parseIdentifier(identifier: string): { teamKey: string; number: number } | null {
-  const match = identifier.match(/^([A-Z]+)-(\d+)$/);
-  if (!match) return null;
-  return { teamKey: match[1], number: parseInt(match[2], 10) };
 }
 
 const QUERY = `

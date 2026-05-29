@@ -8,7 +8,8 @@ vi.mock("node:os", () => ({
   homedir: () => "/mock-home",
 }));
 
-import { GET, PATCH, parseIdentifier } from "@/app/api/issues/[identifier]/route";
+import { GET, PATCH } from "@/app/api/issues/[identifier]/route";
+import { parseIdentifier } from "@/app/api/issues/[identifier]/parse-identifier";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
