@@ -1,8 +1,8 @@
 [Unit]
-Description=Run agent-harness babysit daily
+Description=Run agent-harness babysit every 15 minutes
 
 [Timer]
-OnCalendar=*-*-* 09:17:00
+OnCalendar=*:0/15
 Persistent=true
 
 [Install]
