@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { TeamDetail } from "../../api/teams/[teamId]/route";
 import type { TeamCycle } from "../../api/teams/[teamId]/cycles/route";
@@ -64,13 +64,13 @@ function TeamDetailSkeleton() {
 
 export default function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
-  const router = useRouter();
 
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [cycles, setCycles] = useState<TeamCycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cyclesLoading, setCyclesLoading] = useState(true);
+  const [cyclesError, setCyclesError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"cycles" | "issues">("cycles");
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>("all");
 
@@ -94,12 +94,18 @@ export default function TeamDetailPage() {
 
     fetch(`/api/teams/${teamId}/cycles`, { signal: controller.signal })
       .then(async (res) => {
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
         const data = await res.json();
-        if (!data.error) {
+        if (data.error) {
+          setCyclesError(data.error);
+        } else {
           setCycles(data.cycles ?? []);
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setCyclesError("Failed to fetch cycles");
+      })
       .finally(() => setCyclesLoading(false));
 
     return () => controller.abort();
@@ -228,6 +234,8 @@ export default function TeamDetailPage() {
                 </div>
               ))}
             </div>
+          ) : cyclesError ? (
+            <div className="kanban-error">{cyclesError}</div>
           ) : filteredCycles.length === 0 ? (
             <div className="empty-state">No cycles found</div>
           ) : (
@@ -235,13 +243,10 @@ export default function TeamDetailPage() {
               {filteredCycles.map((cycle) => {
                 const pct = Math.round(cycle.progress * 100);
                 return (
-                  <button
+                  <Link
                     key={cycle.id}
-                    type="button"
+                    href={`/teams/${teamId}/cycles/${cycle.id}`}
                     className="cycle-row"
-                    onClick={() =>
-                      router.push(`/teams/${teamId}/cycles/${cycle.id}`)
-                    }
                   >
                     <div className="cycle-row-info">
                       <span className="cycle-row-name">
@@ -267,7 +272,7 @@ export default function TeamDetailPage() {
                     <span className="cycle-scope-count">
                       {cycle.completedScopeCount}/{cycle.scopeCount}
                     </span>
-                  </button>
+                  </Link>
                 );
               })}
             </div>
