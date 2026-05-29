@@ -8,10 +8,10 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const STATUS_COLORS: Record<string, string> = {
-  planned: "#6b7280",
-  started: "#2563eb",
-  paused: "#f59e0b",
-  completed: "#16a34a",
-  canceled: "#ef4444",
-  backlog: "#9ca3af",
+  planned: "var(--status-todo)",
+  started: "var(--status-in-progress)",
+  paused: "var(--status-rework)",
+  completed: "var(--status-done)",
+  canceled: "var(--status-canceled)",
+  backlog: "var(--status-todo)",
 };
