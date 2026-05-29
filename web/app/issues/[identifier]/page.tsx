@@ -208,7 +208,7 @@ export default function IssueDetailPage() {
               {issue.title}
             </h1>
           )}
-          <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "1rem 0" }} />
+          <hr style={{ border: "none", borderTop: "1px solid var(--border-primary)", margin: "1rem 0" }} />
           {editingDesc ? (
             <textarea
               ref={descTextareaRef}

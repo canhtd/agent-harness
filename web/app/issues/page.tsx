@@ -155,7 +155,7 @@ export default function IssuesPage() {
       {error && <div className="kanban-error">{error}</div>}
       <div className="kanban-top-bar">
         <button
-          className="modal-btn-primary"
+          className="btn-primary"
           onClick={() => setModalOpen(true)}
         >
           New Issue
@@ -187,7 +187,7 @@ export default function IssuesPage() {
                   <div className="kanban-quick-input-wrapper">
                     <input
                       ref={quickInputRef}
-                      className="kanban-quick-input"
+                      className="input kanban-quick-input"
                       value={quickTitle}
                       onChange={(e) => setQuickTitle(e.target.value)}
                       onKeyDown={handleQuickKeyDown}
