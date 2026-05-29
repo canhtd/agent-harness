@@ -129,7 +129,7 @@ export default function CycleDetailPage() {
             className="cycle-detail-progress-fill"
             style={{
               width: `${pct}%`,
-              background: pct === 100 ? "#16a34a" : "var(--color-accent)",
+              background: pct === 100 ? "#16a34a" : "var(--accent)",
             }}
           />
         </div>
