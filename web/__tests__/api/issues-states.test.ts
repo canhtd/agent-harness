@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { GET, _resetStatesCache } from "@/app/api/issues/states/route";
+import { GET } from "@/app/api/issues/states/route";
+import { _resetStatesCache } from "@/app/api/issues/states/cache";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
