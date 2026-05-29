@@ -1887,3 +1887,104 @@ body {
   font-size: 0.8125rem;
   color: var(--color-muted);
 }
+
+/* Team issues */
+
+.team-issues-list {
+  background: var(--color-card);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.team-issue-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.1s;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.team-issue-row:last-child {
+  border-bottom: none;
+}
+
+.team-issue-row:hover {
+  background: var(--color-row-alt);
+}
+
+.team-issue-row-skeleton {
+  pointer-events: none;
+  cursor: default;
+}
+
+.team-issue-id {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  flex-shrink: 0;
+  min-width: 4.5rem;
+}
+
+.team-issue-status {
+  display: inline-block;
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.team-issue-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-issue-priority {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.team-issue-assignee {
+  flex-shrink: 0;
+}
+
+.team-issue-assignee-avatar {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  object-fit: cover;
+  display: block;
+}
+
+.team-issue-assignee-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.625rem;
+  font-weight: 600;
+}

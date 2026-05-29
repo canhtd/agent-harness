@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { TeamDetail } from "../../api/teams/[teamId]/route";
 import type { TeamCycle } from "../../api/teams/[teamId]/cycles/route";
+import type { TeamIssue } from "../../api/teams/[teamId]/issues/route";
 
 type CycleFilter = "all" | "current" | "upcoming";
+type IssueFilter = "all" | "active" | "backlog";
 
 function isCurrent(cycle: TeamCycle): boolean {
   const now = Date.now();
@@ -24,6 +26,13 @@ function formatDate(iso: string): string {
     year: "numeric",
   });
 }
+
+const PRIORITY_COLORS: Record<number, string> = {
+  1: "#ef4444",
+  2: "#f97316",
+  3: "#eab308",
+  4: "#3b82f6",
+};
 
 function TeamDetailSkeleton() {
   return (
@@ -64,17 +73,27 @@ function TeamDetailSkeleton() {
 
 export default function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
+  const router = useRouter();
 
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [cycles, setCycles] = useState<TeamCycle[]>([]);
+  const [issues, setIssues] = useState<TeamIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cyclesLoading, setCyclesLoading] = useState(true);
   const [cyclesError, setCyclesError] = useState<string | null>(null);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issuesError, setIssuesError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"cycles" | "issues">("cycles");
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>("all");
+  const [issueFilter, setIssueFilter] = useState<IssueFilter>("all");
+  const [issuesFetched, setIssuesFetched] = useState(false);
 
   useEffect(() => {
+    setIssuesFetched(false);
+    setIssues([]);
+    setIssuesError(null);
+
     const controller = new AbortController();
 
     fetch(`/api/teams/${teamId}`, { signal: controller.signal })
@@ -111,9 +130,41 @@ export default function TeamDetailPage() {
     return () => controller.abort();
   }, [teamId]);
 
+  useEffect(() => {
+    if (activeTab !== "issues" || issuesFetched) return;
+
+    setIssuesLoading(true);
+    const controller = new AbortController();
+
+    fetch(`/api/teams/${teamId}/issues`, { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
+        const data = await res.json();
+        if (data.error) {
+          setIssuesError(data.error);
+        } else {
+          setIssues(data.issues ?? []);
+        }
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setIssuesError("Failed to fetch issues");
+      })
+      .then(() => setIssuesFetched(true))
+      .finally(() => setIssuesLoading(false));
+
+    return () => controller.abort();
+  }, [activeTab, teamId, issuesFetched]);
+
   const filteredCycles = cycles.filter((c) => {
     if (cycleFilter === "current") return isCurrent(c);
     if (cycleFilter === "upcoming") return isUpcoming(c);
+    return true;
+  });
+
+  const filteredIssues = issues.filter((issue) => {
+    if (issueFilter === "active") return issue.state.type === "started";
+    if (issueFilter === "backlog") return issue.state.type === "backlog";
     return true;
   });
 
@@ -194,9 +245,8 @@ export default function TeamDetailPage() {
         </button>
         <button
           type="button"
-          className="team-detail-tab team-detail-tab-disabled"
-          disabled
-          title="Coming soon"
+          className={`team-detail-tab${activeTab === "issues" ? " team-detail-tab-active" : ""}`}
+          onClick={() => setActiveTab("issues")}
         >
           Issues
         </button>
@@ -275,6 +325,82 @@ export default function TeamDetailPage() {
                   </Link>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "issues" && (
+        <div className="cycle-content">
+          <div className="cycle-filter-bar">
+            {(["all", "active", "backlog"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`cycle-filter-btn${issueFilter === f ? " cycle-filter-btn-active" : ""}`}
+                onClick={() => setIssueFilter(f)}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {issuesLoading ? (
+            <div className="team-issues-list">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="team-issue-row team-issue-row-skeleton">
+                  <div className="skeleton-line skeleton-short" />
+                  <div className="skeleton-line skeleton-long" />
+                </div>
+              ))}
+            </div>
+          ) : issuesError ? (
+            <div className="kanban-error">{issuesError}</div>
+          ) : filteredIssues.length === 0 ? (
+            <div className="empty-state">No issues found</div>
+          ) : (
+            <div className="team-issues-list">
+              {filteredIssues.map((issue) => (
+                <button
+                  key={issue.id}
+                  type="button"
+                  className="team-issue-row"
+                  onClick={() => router.push(`/issues/${issue.identifier}`)}
+                >
+                  <span className="team-issue-id">{issue.identifier}</span>
+                  <span
+                    className="team-issue-status"
+                    style={{
+                      background: `color-mix(in srgb, ${issue.state.color} 15%, transparent)`,
+                      color: issue.state.color,
+                    }}
+                  >
+                    {issue.state.name}
+                  </span>
+                  <span className="team-issue-title">{issue.title}</span>
+                  {issue.priority > 0 && (
+                    <span
+                      className="team-issue-priority"
+                      style={{ background: PRIORITY_COLORS[issue.priority] ?? "var(--color-muted)" }}
+                    />
+                  )}
+                  {issue.assignee && (
+                    <span className="team-issue-assignee">
+                      {issue.assignee.avatarUrl ? (
+                        <img
+                          src={issue.assignee.avatarUrl}
+                          alt={issue.assignee.displayName}
+                          className="team-issue-assignee-avatar"
+                        />
+                      ) : (
+                        <span className="team-issue-assignee-placeholder">
+                          {issue.assignee.displayName.charAt(0)}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
           )}
         </div>
