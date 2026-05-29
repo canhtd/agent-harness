@@ -90,6 +90,10 @@ export default function TeamDetailPage() {
   const [issuesFetched, setIssuesFetched] = useState(false);
 
   useEffect(() => {
+    setIssuesFetched(false);
+    setIssues([]);
+    setIssuesError(null);
+
     const controller = new AbortController();
 
     fetch(`/api/teams/${teamId}`, { signal: controller.signal })
@@ -146,10 +150,8 @@ export default function TeamDetailPage() {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setIssuesError("Failed to fetch issues");
       })
-      .finally(() => {
-        setIssuesLoading(false);
-        setIssuesFetched(true);
-      });
+      .then(() => setIssuesFetched(true))
+      .finally(() => setIssuesLoading(false));
 
     return () => controller.abort();
   }, [activeTab, teamId, issuesFetched]);
