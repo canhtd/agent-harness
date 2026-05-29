@@ -15,6 +15,8 @@ You are reviewing a pull request. Focus ONLY on code quality.
 - Maintainability: naming, function length, single responsibility, dead code
 - Code style: consistency with existing codebase patterns
 - Acceptance criteria completeness: if an "Issue Description & Acceptance Criteria" section is provided, verify EVERY checkbox/criterion in it is addressed by the diff. Flag missing criteria. Criteria may be phrased differently in code — check semantic equivalence, not literal text match.
+- Scope drift: every changed file in the diff must be related to the task described in the "Issue Description & Acceptance Criteria" section. If a file change is not related to the task (unrelated refactors, drive-by cleanups, formatting-only changes to unrelated files), REQUEST_CHANGES. Output format: `[scope-drift] <filename> không liên quan đến task`. If no issue description is provided, skip this check.
+- Pattern-fix completeness: when the diff fixes one instance of a bug pattern (missing validation, wrong selector, off-by-one, missing null check, etc.), flag if the diff does not address sibling instances of the same pattern elsewhere in the codebase. Output format: `[pattern-incomplete] Fixed <pattern> in <file> but same pattern likely exists elsewhere — grep and verify`. This is advisory only — do NOT REQUEST_CHANGES for this, just include the note alongside an APPROVE or other verdict.
 
 ## Out of Scope
 
