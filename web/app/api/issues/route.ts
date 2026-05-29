@@ -7,7 +7,10 @@ export interface IssueCard {
   priority: number;
   url: string;
   status: string;
+  stateType: string;
+  stateColor: string;
   column: "todo" | "working" | "done" | "cancel";
+  assignee: { displayName: string; avatarUrl: string | null } | null;
   createdAt: string;
 }
 
@@ -32,7 +35,8 @@ query($teamKey: String!) {
       priority
       url
       createdAt
-      state { name type }
+      state { name type color }
+      assignee { displayName avatarUrl }
     }
   }
 }`;
@@ -50,7 +54,8 @@ mutation($input: IssueCreateInput!) {
     success
     issue {
       id identifier title priority url createdAt
-      state { name type }
+      state { name type color }
+      assignee { displayName avatarUrl }
     }
   }
 }`;
@@ -156,7 +161,10 @@ export async function POST(request: Request) {
       priority: node.priority,
       url: node.url,
       status: node.state.name,
+      stateType: node.state.type,
+      stateColor: node.state.color,
       column: COLUMN_MAP[node.state.type] ?? "todo",
+      assignee: node.assignee ?? null,
       createdAt: node.createdAt,
     };
 
@@ -190,7 +198,8 @@ export async function GET() {
           priority: number;
           url: string;
           createdAt: string;
-          state: { name: string; type: string };
+          state: { name: string; type: string; color: string };
+          assignee: { displayName: string; avatarUrl: string | null } | null;
         }>;
       };
     };
@@ -236,7 +245,10 @@ export async function GET() {
     priority: node.priority,
     url: node.url,
     status: node.state.name,
+    stateType: node.state.type,
+    stateColor: node.state.color,
     column: COLUMN_MAP[node.state.type] ?? "todo",
+    assignee: node.assignee ?? null,
     createdAt: node.createdAt,
   }));
 
