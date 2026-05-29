@@ -1,19 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400..600&display=swap');
 @import "tailwindcss";
 
-:root,
-[data-theme="dark"] {
-  --bg-primary: #0f0f11;
-  --bg-secondary: #1a1a1c;
-  --bg-tertiary: #232326;
-  --bg-elevated: #1c1c1d;
-  --bg-sidebar: #090909;
-  --border-primary: #1c1e21;
-  --border-secondary: #26282c;
-  --text-primary: #ffffff;
-  --text-secondary: #d0d2d6;
-  --text-tertiary: #b0b5c0;
-  --text-quaternary: #6b6f76;
+:root {
+  --bg-primary: #fcfcfd;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #ededf0;
+  --bg-elevated: #ffffff;
+  --bg-sidebar: #f5f5f5;
+  --border-primary: #e0e0e3;
+  --border-secondary: #d0d0d4;
+  --text-primary: #1a1a1a;
+  --text-secondary: #333333;
+  --text-tertiary: #666666;
+  --text-quaternary: #999999;
   --accent: #5E6AD2;
   --accent-hover: #6872E0;
   --focus-ring: #6D78D5;
@@ -36,12 +35,44 @@
   --color-cost-red: #ef4444;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0f0f11;
+    --bg-secondary: #1a1a1c;
+    --bg-tertiary: #232326;
+    --bg-elevated: #1c1c1d;
+    --bg-sidebar: #090909;
+    --border-primary: #1c1e21;
+    --border-secondary: #26282c;
+    --text-primary: #ffffff;
+    --text-secondary: #d0d2d6;
+    --text-tertiary: #b0b5c0;
+    --text-quaternary: #6b6f76;
+  }
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0f0f11;
+  --bg-secondary: #1a1a1c;
+  --bg-tertiary: #232326;
+  --bg-elevated: #1c1c1d;
+  --bg-sidebar: #090909;
+  --border-primary: #1c1e21;
+  --border-secondary: #26282c;
+  --text-primary: #ffffff;
+  --text-secondary: #d0d2d6;
+  --text-tertiary: #b0b5c0;
+  --text-quaternary: #6b6f76;
+}
+
 [data-theme="light"] {
   --bg-primary: #fcfcfd;
   --bg-secondary: #f5f5f7;
   --bg-tertiary: #ededf0;
   --bg-elevated: #ffffff;
   --bg-sidebar: #f5f5f5;
+  --border-primary: #e0e0e3;
+  --border-secondary: #d0d0d4;
   --text-primary: #1a1a1a;
   --text-secondary: #333333;
   --text-tertiary: #666666;
