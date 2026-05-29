@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectCard } from "../api/projects/route";
+import { STATUS_LABELS } from "./constants";
 import { ProjectListSkeleton } from "./ProjectListSkeleton";
 import { ProjectRow } from "./ProjectRow";
 
@@ -13,15 +14,6 @@ const STATUS_OPTIONS = [
   "completed",
   "canceled",
 ] as const;
-
-const STATUS_LABELS: Record<string, string> = {
-  planned: "Planned",
-  started: "Started",
-  paused: "Paused",
-  completed: "Completed",
-  canceled: "Canceled",
-  backlog: "Backlog",
-};
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectCard[]>([]);
@@ -36,6 +28,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetch("/api/projects")
       .then(async (res) => {
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
         const data = await res.json();
         if (data.error) {
           setError(data.error);
