@@ -5,6 +5,9 @@ import type { ProjectCard } from "../api/projects/route";
 import { STATUS_LABELS } from "./constants";
 import { ProjectListSkeleton } from "./ProjectListSkeleton";
 import { ProjectRow } from "./ProjectRow";
+import { Timeline } from "./timeline";
+
+type ViewMode = "list" | "timeline";
 
 const STATUS_OPTIONS = [
   "All",
@@ -24,6 +27,7 @@ export default function ProjectsPage() {
   const [filterLead, setFilterLead] = useState<string>("All");
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -133,21 +137,26 @@ export default function ProjectsPage() {
         </div>
 
         <div className="project-view-toggle">
-          <button className="project-view-btn project-view-btn-active" type="button">
+          <button
+            className={`project-view-btn ${viewMode === "list" ? "project-view-btn-active" : ""}`}
+            type="button"
+            onClick={() => setViewMode("list")}
+          >
             List
           </button>
           <button
-            className="project-view-btn"
+            className={`project-view-btn ${viewMode === "timeline" ? "project-view-btn-active" : ""}`}
             type="button"
-            disabled
-            title="Coming soon"
+            onClick={() => setViewMode("timeline")}
           >
             Timeline
           </button>
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {viewMode === "timeline" ? (
+        <Timeline projects={filtered} />
+      ) : filtered.length === 0 ? (
         <div className="empty-state">No projects match the current filters</div>
       ) : (
         <div className="project-list">
