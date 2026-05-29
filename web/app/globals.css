@@ -351,6 +351,10 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 220px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .kanban-header {
@@ -358,8 +362,8 @@ body {
   top: 0;
   z-index: 1;
   padding: 0.625rem 0.75rem;
-  border-radius: 0.5rem 0.5rem 0 0;
-  background: var(--bg-elevated);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .kanban-header-label {
@@ -372,19 +376,19 @@ body {
 }
 
 .kanban-header-todo {
-  color: var(--text-quaternary);
+  color: var(--status-todo);
 }
 
 .kanban-header-working {
-  color: var(--accent);
+  color: var(--status-in-progress);
 }
 
 .kanban-header-done {
-  color: #16a34a;
+  color: var(--status-done);
 }
 
 .kanban-header-cancel {
-  color: #dc2626;
+  color: var(--status-canceled);
 }
 
 .kanban-count {
@@ -411,7 +415,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.5rem 0;
+  padding: 0.5rem;
   max-height: calc(100vh - 200px);
   overflow-y: auto;
 }
@@ -423,18 +427,19 @@ body {
   gap: 0.25rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border-primary);
-  border-radius: 0.5rem;
+  border-radius: 10px;
   padding: 0.75rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 3px 6px -2px rgba(0,0,0,.02), 0 1px 1px rgba(0,0,0,.04);
   cursor: pointer;
-  transition: box-shadow 120ms;
+  transition: background 120ms, box-shadow 120ms;
   text-align: left;
   font: inherit;
   color: inherit;
+  text-decoration: none;
 }
 
 .kanban-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: var(--bg-tertiary);
 }
 
 .kanban-card-skeleton {
@@ -490,10 +495,10 @@ body {
 }
 
 .kanban-error {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-  border-radius: 0.5rem;
+  background: color-mix(in srgb, #ef4444 8%, var(--bg-elevated));
+  color: #ef4444;
+  border: 1px solid color-mix(in srgb, #ef4444 25%, var(--bg-elevated));
+  border-radius: 8px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
   margin-bottom: 1rem;
@@ -525,7 +530,7 @@ body {
   display: inline-block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-quaternary);
+  color: var(--text-tertiary);
   text-decoration: none;
   margin-bottom: 1.5rem;
   transition: color 120ms;
@@ -551,11 +556,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-primary);
-  border-radius: 0.75rem;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-primary);
+  border-radius: 0;
   padding: 1.25rem;
-  align-self: flex-start;
+  align-self: stretch;
 }
 
 .detail-title {
@@ -568,9 +573,9 @@ body {
 
 .detail-description {
   white-space: pre-wrap;
-  font-size: 0.9375rem;
+  font-size: 15px;
   line-height: 1.6;
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .detail-meta-label {
@@ -637,7 +642,8 @@ body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   z-index: 50;
   display: flex;
   align-items: center;
@@ -646,8 +652,9 @@ body {
 
 .modal-dialog {
   background: var(--bg-elevated);
-  border-radius: 0.75rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+  border: 0.5px solid var(--border-secondary);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.08), 0 3px 9px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.12);
   width: 100%;
   max-width: 480px;
   padding: 1.5rem;
@@ -691,57 +698,71 @@ body {
 .modal-input {
   display: block;
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
-  background: var(--bg-elevated);
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  background: var(--bg-primary);
   color: var(--text-primary);
   outline: none;
   box-sizing: border-box;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+.modal-input::placeholder {
+  color: var(--text-quaternary);
 }
 
 .modal-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 25%, transparent);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
 .modal-textarea {
   display: block;
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  padding: 6px 8px;
+  font-size: 13px;
   font-family: inherit;
-  border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
-  background: var(--bg-elevated);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  background: var(--bg-primary);
   color: var(--text-primary);
   outline: none;
   resize: vertical;
   box-sizing: border-box;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+.modal-textarea::placeholder {
+  color: var(--text-quaternary);
 }
 
 .modal-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 25%, transparent);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
 .modal-select {
   display: block;
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
-  background: var(--bg-elevated);
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  background: var(--bg-primary);
   color: var(--text-primary);
   outline: none;
   box-sizing: border-box;
+  transition: border-color 120ms, box-shadow 120ms;
 }
 
 .modal-select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 25%, transparent);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
 .modal-error {
@@ -762,19 +783,33 @@ body {
 }
 
 .modal-btn-primary {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 13px;
   font-weight: 500;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 8px;
   background: var(--accent);
   color: #fff;
   cursor: pointer;
-  transition: opacity 120ms;
+  font-family: inherit;
+  transition: background 120ms, transform 120ms, box-shadow 120ms;
 }
 
 .modal-btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
+  background: var(--accent-hover);
+}
+
+.modal-btn-primary:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.modal-btn-primary:focus-visible {
+  box-shadow: 0 0 0 1px var(--focus-ring);
+  outline: none;
 }
 
 .modal-btn-primary:disabled {
@@ -783,19 +818,33 @@ body {
 }
 
 .modal-btn-secondary {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 13px;
   font-weight: 500;
-  border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: background 120ms;
+  font-family: inherit;
+  transition: background 120ms, transform 120ms, box-shadow 120ms;
 }
 
 .modal-btn-secondary:hover {
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
+}
+
+.modal-btn-secondary:active {
+  transform: scale(0.96);
+}
+
+.modal-btn-secondary:focus-visible {
+  box-shadow: 0 0 0 1px var(--focus-ring);
+  outline: none;
 }
 
 /* Kanban inline create */
@@ -834,17 +883,8 @@ body {
 }
 
 .kanban-quick-input {
-  display: block;
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  border: 1px solid var(--accent);
-  border-radius: 0.375rem;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  outline: none;
   box-sizing: border-box;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 25%, transparent);
 }
 
 .kanban-quick-error {
@@ -857,12 +897,12 @@ body {
 
 .detail-editable {
   cursor: pointer;
-  border-radius: 0.25rem;
+  border-radius: 6px;
   transition: background 120ms;
 }
 
 .detail-editable:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-tertiary);
 }
 
 .detail-title-input {
@@ -911,12 +951,12 @@ body {
   left: 0;
   z-index: 50;
   margin-top: 0.25rem;
-  min-width: 180px;
+  min-width: 200px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-primary);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 0.25rem;
+  border: 0.5px solid var(--border-secondary);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.08), 0 3px 9px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.12);
+  padding: 6px;
   display: flex;
   flex-direction: column;
 }
@@ -924,26 +964,29 @@ body {
 .detail-dropdown-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  gap: 9px;
+  height: 32px;
+  padding: 0 0.75rem;
+  font-size: 13px;
   font-family: inherit;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   background: none;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
-  transition: background 120ms;
+  transition: background 120ms, color 120ms;
 }
 
 .detail-dropdown-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .detail-dropdown-active {
-  background: rgba(16, 163, 127, 0.08);
+  background: var(--bg-tertiary);
   font-weight: 500;
+  color: var(--text-primary);
 }
 
 .detail-dropdown-dot {
@@ -972,8 +1015,9 @@ body {
 /* Agent metadata section */
 
 .detail-agent-section {
-  border-top: 1px solid var(--border-primary);
-  padding-top: 1.25rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
@@ -983,7 +1027,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+}
+
+.detail-agent-section .detail-meta-value,
+.detail-agent-section .detail-cost {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 }
 
 .detail-cost {
