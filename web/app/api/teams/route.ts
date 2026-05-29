@@ -23,6 +23,7 @@ query {
     nodes {
       id name key description color icon
       members(first: 5) {
+        totalCount
         nodes { id displayName avatarUrl }
       }
     }
@@ -49,6 +50,7 @@ export async function GET() {
           color: string | null;
           icon: string | null;
           members: {
+            totalCount: number;
             nodes: Array<{
               id: string;
               displayName: string;
@@ -100,7 +102,7 @@ export async function GET() {
     description: node.description,
     color: node.color,
     icon: node.icon,
-    memberCount: node.members.nodes.length,
+    memberCount: node.members.totalCount,
     members: node.members.nodes.map((m) => ({
       id: m.id,
       displayName: m.displayName,
