@@ -115,6 +115,6 @@ Systemd default `KillMode=control-group` kills the entire cgroup on restart, inc
 
 Agent harness builds itself (bootstrapping). All features/fixes must go through Linear issue → orchestrator dispatch → agent implements. Do not code by hand and push directly. Only code by hand when the agent cannot do it itself (e.g. fixing a broken orchestrator that cannot dispatch).
 
-## Design system uses hardcoded dark default (temporary)
+## Theme follows system preference by default
 
-`web/app/layout.tsx` sets `data-theme="dark"` on `<html>` and `globals.css` uses `:root, [data-theme="dark"]` for dark tokens. System `prefers-color-scheme` is NOT consulted — dark is always the default when localStorage is empty. This is intentional (ENG-86 decision) — ENG-80b will add system preference detection. Do not "fix" this to use `@media (prefers-color-scheme)` until ENG-80b is picked up.
+`web/app/layout.tsx` does NOT set `data-theme` on `<html>`. When localStorage is empty, CSS `@media (prefers-color-scheme: dark)` applies dark tokens automatically. Users can override via the 3-state toggle (system → dark → light). `[data-theme="dark"]` and `[data-theme="light"]` force the respective theme. Implemented in ENG-87.
