@@ -165,7 +165,7 @@ body {
 
 .card-label {
   font-size: 0.8125rem;
-  color: var(--text-quaternary);
+  color: var(--text-tertiary);
   font-weight: 500;
 }
 
@@ -177,8 +177,9 @@ body {
 
 .table-wrapper {
   background: var(--bg-elevated);
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  box-shadow: 0 3px 6px -2px rgba(0,0,0,.02), 0 1px 1px rgba(0,0,0,.04);
   overflow-x: auto;
 }
 
@@ -259,13 +260,13 @@ body {
 }
 
 .status-completed {
-  background: color-mix(in srgb, #16a34a 12%, transparent);
-  color: #16a34a;
+  background: color-mix(in srgb, var(--status-done) 12%, transparent);
+  color: var(--status-done);
 }
 
 .status-failed {
-  background: color-mix(in srgb, #ef4444 12%, transparent);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--status-blocked) 12%, transparent);
+  color: var(--status-blocked);
 }
 
 .status-unknown {
@@ -284,8 +285,9 @@ body {
 
 .chart-container {
   background: var(--bg-elevated);
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  box-shadow: 0 3px 6px -2px rgba(0,0,0,.02), 0 1px 1px rgba(0,0,0,.04);
   padding: 1.25rem 1.5rem;
   margin-bottom: 2rem;
   position: relative;
@@ -334,11 +336,11 @@ body {
 }
 
 .chart-bar-completed {
-  background: #16a34a;
+  background: var(--accent);
 }
 
 .chart-bar-failed {
-  background: #ef4444;
+  background: var(--text-quaternary);
 }
 
 .chart-bar-date {
@@ -355,9 +357,10 @@ body {
   position: fixed;
   transform: translate(-50%, -100%);
   margin-top: -8px;
-  background: var(--text-primary);
-  color: #fff;
-  border-radius: 0.5rem;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
   padding: 0.5rem 0.75rem;
   font-size: 0.75rem;
   display: flex;
@@ -366,7 +369,7 @@ body {
   pointer-events: none;
   z-index: 100;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 18px rgba(0,0,0,.08), 0 3px 9px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.12);
 }
 
 /* Kanban board */
@@ -526,9 +529,9 @@ body {
 }
 
 .kanban-error {
-  background: color-mix(in srgb, #ef4444 8%, var(--bg-elevated));
-  color: #ef4444;
-  border: 1px solid color-mix(in srgb, #ef4444 25%, var(--bg-elevated));
+  background: color-mix(in srgb, var(--status-blocked) 8%, var(--bg-elevated));
+  color: var(--status-blocked);
+  border: 1px solid color-mix(in srgb, var(--status-blocked) 20%, var(--bg-elevated));
   border-radius: 8px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
