@@ -136,6 +136,30 @@ export default function PRDetailPage() {
         </div>
       </div>
 
+      {review.state === "MERGED" && (
+        <div className="review-merged-banner">
+          <span className="review-state-badge review-state-badge-merged">Merged</span>
+          <span>
+            This PR was merged
+            {review.mergedAt && (
+              <> on {new Date(review.mergedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>
+            )}
+          </span>
+        </div>
+      )}
+
+      {review.state === "CLOSED" && (
+        <div className="review-closed-banner">
+          <span className="review-state-badge review-state-badge-closed">Closed</span>
+          <span>
+            This PR was closed
+            {review.closedAt && (
+              <> on {new Date(review.closedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>
+            )}
+          </span>
+        </div>
+      )}
+
       <div className="review-detail-files">
         <div className="review-detail-files-summary">
           {files.length} file{files.length !== 1 ? "s" : ""} changed

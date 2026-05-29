@@ -17,6 +17,8 @@ export interface ReviewDetail {
   deletions: number;
   createdAt: string;
   updatedAt: string;
+  mergedAt: string | null;
+  closedAt: string | null;
 }
 
 export interface FileChange {
@@ -50,7 +52,7 @@ export async function GET(
         "view",
         String(num),
         "--json",
-        "number,title,body,state,headRefName,baseRefName,author,reviewDecision,additions,deletions,createdAt,updatedAt",
+        "number,title,body,state,headRefName,baseRefName,author,reviewDecision,additions,deletions,createdAt,updatedAt,mergedAt,closedAt",
       ]),
       execFileAsync("gh", [
         "api",
@@ -72,6 +74,8 @@ export async function GET(
       deletions: number;
       createdAt: string;
       updatedAt: string;
+      mergedAt: string | null;
+      closedAt: string | null;
     };
 
     const review: ReviewDetail = {
@@ -87,6 +91,8 @@ export async function GET(
       deletions: rawMeta.deletions,
       createdAt: rawMeta.createdAt,
       updatedAt: rawMeta.updatedAt,
+      mergedAt: rawMeta.mergedAt ?? null,
+      closedAt: rawMeta.closedAt ?? null,
     };
 
     const rawFiles = JSON.parse(filesResult.stdout) as Array<{
