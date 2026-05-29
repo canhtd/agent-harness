@@ -38,6 +38,15 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/projects",
+    label: "Projects",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1 1.5h5.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5v-7Z" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar() {
