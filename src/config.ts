@@ -8,7 +8,7 @@ export const config = {
   teamKey: process.env.LINEAR_TEAM_KEY!,
   projectSlug: process.env.LINEAR_PROJECT_SLUG || undefined,
   repoPath: process.env.REPO_PATH || process.cwd(),
-  maxConcurrent: 10,
+  maxConcurrent: Number(process.env.MAX_CONCURRENT) || 2,
   maxReworkConcurrent: 2,
   stallTimeoutMs: Number(process.env.STALL_TIMEOUT_MS) || 600_000,
   maxTurns: Number(process.env.MAX_TURNS) || 5,
