@@ -43,7 +43,7 @@ export function Timeline({ projects }: TimelineProps) {
     y: number;
   } | null>(null);
 
-  const { rangeStart, rangeEnd, totalDays, months } = useMemo(() => {
+  const { rangeStart, totalDays, months } = useMemo(() => {
     const today = new Date();
     let earliest = today;
     let latest = today;
