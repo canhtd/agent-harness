@@ -12,11 +12,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}`,
+          }}
+        />
+      </head>
       <body
         style={{
           fontFamily:
-            'Inter, "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+            '"Inter Variable", Inter, "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif',
         }}
       >
         <div className="app-shell">
