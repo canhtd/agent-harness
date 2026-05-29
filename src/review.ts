@@ -12,6 +12,7 @@ const REVIEWERS = [
   { name: 'quality', skill: 'review-quality' },
   { name: 'security', skill: 'review-security' },
   { name: 'deps', skill: 'review-deps' },
+  { name: 'architecture', skill: 'review-architecture' },
 ] as const
 
 interface ReviewResult {
