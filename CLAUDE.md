@@ -45,6 +45,7 @@ Agent orchestrator — polls Linear for Todo issues, spawns Claude Code CLI sess
 Read [README.md](README.md) for product overview and workflow documentation.
 Read [GOTCHAS.md](GOTCHAS.md) before starting any task — contains known pitfalls from prior work.
 Read [PLANS.md](PLANS.md) for project phases and progress.
+Read [workos-design-system/DESIGN.md](workos-design-system/DESIGN.md) for the UI design system (tokens, components, icons) — derived from Linear, used for any web/UI work. Showcase at [workos-design-system/index.html](workos-design-system/index.html).
 
 ## Safety Rails
 
