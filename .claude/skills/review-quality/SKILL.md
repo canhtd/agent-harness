@@ -41,3 +41,7 @@ REQUEST_CHANGES
 ```
 
 Be specific. Reference exact file and line for code issues. For missing acceptance criteria, quote the criterion text. Only flag real problems, not style preferences.
+
+## Severity Filter
+
+Only REQUEST_CHANGES for bugs that will break in normal usage. Ignore theoretical edge cases (paths with unusual characters, unlikely race conditions, adversarial input, unusual system config). If it only breaks with adversarial or non-standard input, APPROVE.
