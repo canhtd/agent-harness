@@ -1988,3 +1988,153 @@ body {
   font-size: 0.625rem;
   font-weight: 600;
 }
+
+/* Reviews */
+
+.review-page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 1.25rem;
+  color: var(--color-ink);
+}
+
+.review-list {
+  background: var(--color-card);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.review-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.1s;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.review-row:last-child {
+  border-bottom: none;
+}
+
+.review-row:hover {
+  background: var(--color-row-alt);
+}
+
+.review-row-skeleton {
+  pointer-events: none;
+  cursor: default;
+}
+
+.review-number {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  flex-shrink: 0;
+  min-width: 3.5rem;
+}
+
+.review-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.review-branch {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  background: var(--color-page);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  flex-shrink: 0;
+}
+
+.review-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.review-badge-approved {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  color: #16a34a;
+}
+
+.review-badge-changes {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #ef4444;
+}
+
+.review-badge-pending {
+  background: color-mix(in srgb, var(--color-muted) 12%, transparent);
+  color: var(--color-muted);
+}
+
+.review-author {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 5rem;
+}
+
+.review-stat {
+  display: flex;
+  gap: 0.375rem;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 5rem;
+}
+
+.review-additions {
+  color: #16a34a;
+}
+
+.review-deletions {
+  color: #ef4444;
+}
+
+.review-time {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 3.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
