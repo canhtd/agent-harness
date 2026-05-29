@@ -12,17 +12,18 @@
   "dependencies": {
     "next": "^15.3.3",
     "react": "^19.1.0",
+    "react-diff-viewer-continued": "^4.2.2",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
-    "tailwindcss": "^4.1.7",
     "@tailwindcss/postcss": "^4.1.7",
-    "postcss": "^8.5.4",
-    "typescript": "^5.7.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "postcss": "^8.5.4",
+    "tailwindcss": "^4.1.7",
+    "typescript": "^5.7.0",
     "vitest": "^4.1.7"
   }
 }
