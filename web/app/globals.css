@@ -2341,6 +2341,65 @@ body {
   color: #fff;
 }
 
+/* Review tab bar */
+
+.review-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 1rem;
+}
+
+.review-tab {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.review-tab:hover {
+  color: var(--color-ink);
+}
+
+.review-tab-active {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-accent);
+}
+
+/* PR state badges (list page) */
+
+.pr-state-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pr-state-badge-open {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  color: #16a34a;
+}
+
+.pr-state-badge-merged {
+  background: color-mix(in srgb, #8957e5 12%, transparent);
+  color: #8957e5;
+}
+
+.pr-state-badge-closed {
+  background: color-mix(in srgb, var(--color-muted) 12%, transparent);
+  color: var(--color-muted);
+}
+
 /* Diff empty state */
 
 .diff-empty {
