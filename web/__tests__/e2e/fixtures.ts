@@ -30,7 +30,10 @@ export const mockIssues: IssueCard[] = [
     priority: 2,
     url: "https://linear.app/team/issue/ENG-55",
     status: "Todo",
+    stateType: "unstarted",
+    stateColor: "#8a8f98",
     column: "todo",
+    assignee: null,
     createdAt: "2026-01-01T00:00:00.000Z",
   },
   {
@@ -40,7 +43,10 @@ export const mockIssues: IssueCard[] = [
     priority: 1,
     url: "https://linear.app/team/issue/ENG-56",
     status: "In Progress",
+    stateType: "started",
+    stateColor: "#f2c94c",
     column: "working",
+    assignee: { displayName: "Ada Lovelace", avatarUrl: null },
     createdAt: "2026-01-02T00:00:00.000Z",
   },
   {
@@ -50,7 +56,10 @@ export const mockIssues: IssueCard[] = [
     priority: 3,
     url: "https://linear.app/team/issue/ENG-57",
     status: "Done",
+    stateType: "completed",
+    stateColor: "#5e6ad2",
     column: "done",
+    assignee: null,
     createdAt: "2026-01-03T00:00:00.000Z",
   },
 ];

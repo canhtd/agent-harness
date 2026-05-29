@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CycleDetail } from "../../../../api/cycles/[cycleId]/route";
+import StatusIcon from "../../../../components/StatusIcon";
+import PriorityIcon from "../../../../components/PriorityIcon";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -163,25 +165,20 @@ export default function CycleDetailPage() {
                     <span className="cycle-detail-issue-title">{issue.title}</span>
                   </td>
                   <td className="table-td">
-                    <span
-                      className="status-badge"
-                      style={{
-                        background: `color-mix(in srgb, ${issue.state.color} 12%, transparent)`,
-                        color: issue.state.color,
-                      }}
-                    >
-                      {issue.state.name}
+                    <span className="cycle-detail-status">
+                      <StatusIcon type={issue.state.type} color={issue.state.color} />
+                      <span className="cycle-detail-status-label">
+                        {issue.state.name}
+                      </span>
                     </span>
                   </td>
                   <td className="table-td">
-                    {issue.priority > 0 && (
-                      <span className="cycle-detail-priority">
-                        <span className={`priority-dot-inline priority-${issue.priority}`} />
-                        <span className="cycle-detail-priority-label">
-                          {PRIORITY_LABELS[issue.priority] ?? ""}
-                        </span>
+                    <span className="cycle-detail-priority">
+                      <PriorityIcon priority={issue.priority} size={16} />
+                      <span className="cycle-detail-priority-label">
+                        {PRIORITY_LABELS[issue.priority] ?? ""}
                       </span>
-                    )}
+                    </span>
                   </td>
                   <td className="table-td">
                     {issue.assignee ? (

@@ -6,6 +6,8 @@ import Link from "next/link";
 import type { TeamDetail } from "../../api/teams/[teamId]/route";
 import type { TeamCycle } from "../../api/teams/[teamId]/cycles/route";
 import type { TeamIssue } from "../../api/teams/[teamId]/issues/route";
+import StatusIcon from "../../components/StatusIcon";
+import PriorityIcon from "../../components/PriorityIcon";
 
 type CycleFilter = "all" | "current" | "upcoming";
 type IssueFilter = "all" | "active" | "backlog";
@@ -26,13 +28,6 @@ function formatDate(iso: string): string {
     year: "numeric",
   });
 }
-
-const PRIORITY_COLORS: Record<number, string> = {
-  1: "#ef4444",
-  2: "#f97316",
-  3: "#eab308",
-  4: "#3b82f6",
-};
 
 function TeamDetailSkeleton() {
   return (
@@ -368,22 +363,13 @@ export default function TeamDetailPage() {
                   onClick={() => router.push(`/issues/${issue.identifier}`)}
                 >
                   <span className="team-issue-id">{issue.identifier}</span>
-                  <span
-                    className="team-issue-status"
-                    style={{
-                      background: `color-mix(in srgb, ${issue.state.color} 15%, transparent)`,
-                      color: issue.state.color,
-                    }}
-                  >
-                    {issue.state.name}
+                  <span className="team-issue-status-icon" title={issue.state.name}>
+                    <StatusIcon type={issue.state.type} color={issue.state.color} />
                   </span>
                   <span className="team-issue-title">{issue.title}</span>
-                  {issue.priority > 0 && (
-                    <span
-                      className="team-issue-priority"
-                      style={{ background: PRIORITY_COLORS[issue.priority] ?? "var(--color-muted)" }}
-                    />
-                  )}
+                  <span className="team-issue-priority-icon">
+                    <PriorityIcon priority={issue.priority} size={16} />
+                  </span>
                   {issue.assignee && (
                     <span className="team-issue-assignee">
                       {issue.assignee.avatarUrl ? (

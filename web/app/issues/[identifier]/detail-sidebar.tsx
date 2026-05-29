@@ -12,6 +12,8 @@ import {
   relativeTime,
   useClickOutside,
 } from "./utils";
+import StatusIcon from "../../components/StatusIcon";
+import PriorityIcon from "../../components/PriorityIcon";
 
 interface DetailSidebarProps {
   issue: IssueDetail;
@@ -71,13 +73,10 @@ export default function DetailSidebar({ issue, workflowStates, onPatch, onIssueU
       <div ref={statusDropdownRef} style={{ position: "relative" }}>
         <span className="detail-meta-label">Status</span>
         <span
-          className={`label-pill detail-editable${savingStatus ? " detail-saving" : ""}${statusError ? " detail-error-flash" : ""}`}
-          style={{
-            background: `${issue.state.color}18`,
-            color: issue.state.color,
-          }}
+          className={`detail-meta-value detail-editable${savingStatus ? " detail-saving" : ""}${statusError ? " detail-error-flash" : ""}`}
           onClick={() => setStatusOpen(!statusOpen)}
         >
+          <StatusIcon type={issue.state.type} color={issue.state.color} />
           {issue.state.name}
         </span>
         {statusOpen && (
@@ -88,10 +87,7 @@ export default function DetailSidebar({ issue, workflowStates, onPatch, onIssueU
                 className={`detail-dropdown-item${s.id === issue.state.id ? " detail-dropdown-active" : ""}`}
                 onClick={() => selectStatus(s)}
               >
-                <span
-                  className="detail-dropdown-dot"
-                  style={{ background: s.color }}
-                />
+                <StatusIcon type={s.type} color={s.color} />
                 {s.name}
               </button>
             ))}
@@ -104,11 +100,7 @@ export default function DetailSidebar({ issue, workflowStates, onPatch, onIssueU
           className={`detail-meta-value detail-editable${savingPriority ? " detail-saving" : ""}${priorityError ? " detail-error-flash" : ""}`}
           onClick={() => setPriorityOpen(!priorityOpen)}
         >
-          {issue.priority > 0 && (
-            <span
-              className={`priority-dot priority-dot-inline priority-${issue.priority}`}
-            />
-          )}
+          <PriorityIcon priority={issue.priority} size={16} />
           {PRIORITY_LABELS[issue.priority] ?? "Unknown"}
         </span>
         {priorityOpen && (
@@ -119,11 +111,7 @@ export default function DetailSidebar({ issue, workflowStates, onPatch, onIssueU
                 className={`detail-dropdown-item${opt.value === issue.priority ? " detail-dropdown-active" : ""}`}
                 onClick={() => selectPriority(opt.value)}
               >
-                {opt.value > 0 && (
-                  <span
-                    className={`priority-dot priority-dot-inline priority-${opt.value}`}
-                  />
-                )}
+                <PriorityIcon priority={opt.value} size={16} />
                 {opt.label}
               </button>
             ))}

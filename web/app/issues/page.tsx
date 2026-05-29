@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { IssueCard } from "../api/issues/route";
 import CreateIssueModal from "../components/CreateIssueModal";
+import StatusIcon from "../components/StatusIcon";
+import PriorityIcon from "../components/PriorityIcon";
 
 const COLUMNS = [
   { key: "todo" as const, label: "Todo", colorClass: "kanban-header-todo" },
@@ -63,7 +65,10 @@ export default function IssuesPage() {
       priority: 3,
       url: "",
       status: "Todo",
+      stateType: "unstarted",
+      stateColor: "#8a8f98",
       column: "todo",
+      assignee: null,
       createdAt: new Date().toISOString(),
     };
 
@@ -208,13 +213,33 @@ export default function IssuesPage() {
                       href={`/issues/${issue.identifier}`}
                       className="kanban-card"
                     >
-                      {issue.priority > 0 && (
-                        <span
-                          className={`priority-dot priority-${issue.priority}`}
+                      <div className="kanban-card-top">
+                        <span className="kanban-id">{issue.identifier}</span>
+                        {issue.assignee &&
+                          (issue.assignee.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={issue.assignee.avatarUrl}
+                              alt={issue.assignee.displayName}
+                              className="kanban-avatar"
+                            />
+                          ) : (
+                            <span className="kanban-avatar-placeholder">
+                              {issue.assignee.displayName.charAt(0)}
+                            </span>
+                          ))}
+                      </div>
+                      <div className="kanban-card-title-row">
+                        <StatusIcon
+                          type={issue.stateType}
+                          color={issue.stateColor}
+                          size={14}
                         />
-                      )}
-                      <span className="kanban-id">{issue.identifier}</span>
-                      <span className="kanban-title">{issue.title}</span>
+                        <span className="kanban-title">{issue.title}</span>
+                      </div>
+                      <div className="kanban-card-footer">
+                        <PriorityIcon priority={issue.priority} size={16} />
+                      </div>
                     </Link>
                   ))
                 )}
