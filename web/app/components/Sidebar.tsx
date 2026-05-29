@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_ITEMS = [
   {
@@ -97,6 +98,9 @@ export default function Sidebar() {
           );
         })}
       </nav>
+      <div className="sidebar-bottom">
+        <ThemeToggle />
+      </div>
     </aside>
   );
 }
