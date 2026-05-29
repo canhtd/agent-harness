@@ -507,7 +507,7 @@ body {
 .skeleton-line {
   height: 0.75rem;
   border-radius: 0.25rem;
-  background: var(--border-secondary);
+  background: var(--bg-tertiary);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -1048,6 +1048,10 @@ body {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
 }
 
 .project-filters {
@@ -1058,51 +1062,62 @@ body {
 }
 
 .project-filter-select {
-  padding: 0.375rem 0.625rem;
-  font-size: 0.8125rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
   background: var(--bg-elevated);
   color: var(--text-primary);
   outline: none;
   cursor: pointer;
+  transition: border-color 120ms, box-shadow 120ms;
 }
 
 .project-filter-select:focus {
-  border-color: var(--accent);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
 .project-filter-date {
-  padding: 0.375rem 0.625rem;
-  font-size: 0.8125rem;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
   font-family: inherit;
-  border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
   background: var(--bg-elevated);
   color: var(--text-primary);
   outline: none;
+  transition: border-color 120ms, box-shadow 120ms;
 }
 
 .project-filter-date:focus {
-  border-color: var(--accent);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
 .project-view-toggle {
   display: flex;
   border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
+  border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .project-view-btn {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
+  padding: 0 10px;
+  height: 28px;
+  font-size: 13px;
   font-weight: 500;
   border: none;
   background: var(--bg-elevated);
-  color: var(--text-quaternary);
+  color: var(--text-tertiary);
   cursor: pointer;
+  font-family: inherit;
   transition: background 120ms, color 120ms;
 }
 
@@ -1110,19 +1125,14 @@ body {
   border-right: 1px solid var(--border-primary);
 }
 
-.project-view-btn:hover:not(:disabled) {
+.project-view-btn:hover:not(:disabled):not(.project-view-btn-active) {
   background: var(--bg-primary);
   color: var(--text-primary);
 }
 
 .project-view-btn-active {
-  background: var(--accent);
-  color: #fff;
-}
-
-.project-view-btn-active:hover:not(:disabled) {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .project-view-btn:disabled {
@@ -1132,8 +1142,8 @@ body {
 
 .project-list {
   background: var(--bg-elevated);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -1141,8 +1151,9 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem 1rem;
+  padding: 0.625rem 1rem;
   border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-elevated);
   transition: background 120ms;
 }
 
@@ -1181,18 +1192,19 @@ body {
 .project-row-name {
   flex: 1;
   min-width: 0;
-  font-size: 0.875rem;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text-primary);
 }
 
 .project-status-badge {
   display: inline-block;
   padding: 0.125rem 0.5rem;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
   white-space: nowrap;
@@ -1211,18 +1223,19 @@ body {
   flex: 1;
   height: 4px;
   border-radius: 2px;
-  background: var(--border-primary);
+  background: var(--bg-tertiary);
   overflow: hidden;
 }
 
 .project-progress-fill {
   height: 100%;
   border-radius: 2px;
+  background: var(--accent);
   transition: width 0.3s ease;
 }
 
 .project-progress-text {
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-quaternary);
   font-variant-numeric: tabular-nums;
@@ -1239,51 +1252,54 @@ body {
 }
 
 .project-lead-avatar {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 20px;
+  height: 20px;
   border-radius: 9999px;
   object-fit: cover;
   flex-shrink: 0;
+  box-shadow: 0 0 0 1px var(--border-primary);
 }
 
 .project-lead-avatar-placeholder {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 20px;
+  height: 20px;
   border-radius: 9999px;
-  background: var(--border-primary);
+  background: var(--bg-tertiary);
   color: var(--text-quaternary);
   font-size: 0.6875rem;
   font-weight: 600;
   flex-shrink: 0;
+  box-shadow: 0 0 0 1px var(--border-primary);
 }
 
 .project-lead-name {
-  font-size: 0.8125rem;
-  color: var(--text-quaternary);
+  font-size: 12px;
+  color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .project-row-dates {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--text-quaternary);
   white-space: nowrap;
   flex-shrink: 0;
   min-width: 140px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 }
 
 /* Timeline view */
 
 .timeline-container {
-  background: var(--bg-elevated);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -1292,7 +1308,7 @@ body {
   border-bottom: 1px solid var(--border-primary);
   position: sticky;
   top: 0;
-  background: var(--bg-elevated);
+  background: var(--bg-primary);
   z-index: 2;
 }
 
@@ -1300,11 +1316,11 @@ body {
   width: 200px;
   flex-shrink: 0;
   padding: 0.625rem 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 510;
   color: var(--text-quaternary);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   border-right: 1px solid var(--border-primary);
 }
 
@@ -1321,7 +1337,7 @@ body {
   display: flex;
   align-items: center;
   padding-left: 0.5rem;
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-quaternary);
   border-left: 1px solid var(--border-primary);
@@ -1366,10 +1382,11 @@ body {
   padding: 0.5rem 1rem;
   border-right: 1px solid var(--border-primary);
   overflow: hidden;
+  color: var(--text-secondary);
 }
 
 .timeline-row-name {
-  font-size: 0.8125rem;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -1386,7 +1403,7 @@ body {
 .timeline-bar {
   position: absolute;
   height: 1.25rem;
-  border-radius: 0.25rem;
+  border-radius: 4px;
   overflow: hidden;
   cursor: default;
   min-width: 4px;
@@ -1398,7 +1415,7 @@ body {
 
 .timeline-bar-fill {
   height: 100%;
-  border-radius: 0.25rem 0 0 0.25rem;
+  border-radius: 4px 0 0 4px;
   transition: width 0.3s ease;
 }
 
@@ -1406,27 +1423,29 @@ body {
   position: fixed;
   transform: translate(-50%, -100%);
   margin-top: -8px;
-  background: var(--text-primary);
-  color: #fff;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.75rem;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 0.625rem 0.875rem;
+  font-size: 12px;
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.25rem;
   pointer-events: none;
   z-index: 100;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: lch(0 0 0 / .02) 0 6px 18px, lch(0 0 0 / .04) 0 3px 9px, lch(0 0 0 / .04) 0 1px 1px;
 }
 
 .timeline-tooltip-name {
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 .timeline-tooltip-meta {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-tertiary);
 }
 
 /* Teams list */
@@ -2645,7 +2664,13 @@ body,
 .kanban-card,
 .modal-dialog,
 .review-detail-file,
-.chart-container {
+.chart-container,
+.project-filter-bar,
+.project-list,
+.project-row,
+.timeline-container,
+.timeline-header,
+.timeline-tooltip {
   transition: background-color 120ms, border-color 120ms, color 120ms;
 }
 

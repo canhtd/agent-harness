@@ -37,10 +37,7 @@ export function ProjectRow({ project }: { project: ProjectCard }) {
         <div className="project-progress-bar">
           <div
             className="project-progress-fill"
-            style={{
-              width: `${Math.round(project.progress * 100)}%`,
-              background: statusColor,
-            }}
+            style={{ width: `${Math.round(project.progress * 100)}%` }}
           />
         </div>
         <span className="project-progress-text">
