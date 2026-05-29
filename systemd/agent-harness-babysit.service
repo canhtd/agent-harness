@@ -1,0 +1,10 @@
+[Unit]
+Description=Agent Harness daily babysit health check
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/agent-harness/scripts/babysit.sh
+WorkingDirectory=%h/projects/agent-harness
+StandardOutput=append:%h/.agent-harness/logs/babysit.log
+StandardError=append:%h/.agent-harness/logs/babysit.log
