@@ -26,7 +26,8 @@ export default function ProjectsPage() {
   const [filterDateTo, setFilterDateTo] = useState<string>("");
 
   useEffect(() => {
-    fetch("/api/projects")
+    const controller = new AbortController();
+    fetch("/api/projects", { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`API returned ${res.status}`);
         const data = await res.json();
@@ -34,11 +35,15 @@ export default function ProjectsPage() {
           setError(data.error);
           setProjects(data.projects ?? []);
         } else {
-          setProjects(data.projects);
+          setProjects(data.projects ?? []);
         }
       })
-      .catch(() => setError("Failed to fetch projects"))
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError("Failed to fetch projects");
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   const uniqueLeads = useMemo(() => {

@@ -3,7 +3,7 @@ import { STATUS_COLORS, STATUS_LABELS } from "./constants";
 
 function formatShortDate(iso: string | null): string {
   if (!iso) return "—";
-  const d = new Date(iso);
+  const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
