@@ -77,5 +77,7 @@ export const mockIssueDetail: { issue: IssueDetail } = {
     state: { id: "state-1", name: "Todo", type: "unstarted", color: "#e2e2e2" },
     labels: [{ id: "label-1", name: "feature", color: "#0ea5e9" }],
     assignee: null,
+    comments: [],
+    history: [],
   },
 };
