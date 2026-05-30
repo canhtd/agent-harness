@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import type { IssueDetail } from "../../api/issues/[identifier]/route";
 import type { WorkflowState } from "../../api/issues/states/route";
 import DetailSidebar from "./detail-sidebar";
+import Markdown from "../../components/Markdown";
+import Activity from "./activity";
 
 export default function IssueDetailPage() {
   const { identifier } = useParams<{ identifier: string }>();
@@ -228,7 +230,7 @@ export default function IssueDetailPage() {
               onClick={startEditDesc}
             >
               {issue.description ? (
-                <div className="detail-description">{issue.description}</div>
+                <Markdown content={issue.description} className="detail-description" />
               ) : (
                 <p className="text-muted" style={{ fontStyle: "italic" }}>
                   No description
@@ -236,6 +238,7 @@ export default function IssueDetailPage() {
               )}
             </div>
           )}
+          <Activity comments={issue.comments} history={issue.history} />
         </div>
         <DetailSidebar
           issue={issue}

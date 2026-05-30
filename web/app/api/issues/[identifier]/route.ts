@@ -15,6 +15,26 @@ export interface AgentMeta {
   prSearchUrl: string;
 }
 
+export interface IssueComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  user: { id: string; displayName: string; avatarUrl: string } | null;
+}
+
+export interface IssueHistoryEntry {
+  id: string;
+  createdAt: string;
+  fromState: { name: string; color: string } | null;
+  toState: { name: string; color: string } | null;
+  fromPriority: number | null;
+  toPriority: number | null;
+  fromAssignee: { displayName: string } | null;
+  toAssignee: { displayName: string } | null;
+  actor: { displayName: string; avatarUrl: string } | null;
+}
+
 export interface IssueDetail {
   id: string;
   identifier: string;
@@ -27,6 +47,8 @@ export interface IssueDetail {
   state: { id: string; name: string; type: string; color: string };
   labels: Array<{ id: string; name: string; color: string }>;
   assignee: { id: string; displayName: string; avatarUrl: string } | null;
+  comments: IssueComment[];
+  history: IssueHistoryEntry[];
   agentMeta?: AgentMeta;
 }
 
@@ -39,6 +61,8 @@ query($teamKey: String!, $number: Float!) {
       state { id name type color }
       labels { nodes { id name color } }
       assignee { id displayName avatarUrl }
+      comments { nodes { id body createdAt updatedAt user { id displayName avatarUrl } } }
+      history { nodes { id createdAt fromState { name color } toState { name color } fromPriority toPriority fromAssignee { displayName } toAssignee { displayName } actor { displayName avatarUrl } } }
     }
   }
 }`;
@@ -65,30 +89,8 @@ export async function GET(
     );
   }
 
-  let data: {
-    data?: {
-      issues: {
-        nodes: Array<{
-          id: string;
-          identifier: string;
-          title: string;
-          description: string | null;
-          priority: number;
-          url: string;
-          createdAt: string;
-          updatedAt: string;
-          state: { id: string; name: string; type: string; color: string };
-          labels: { nodes: Array<{ id: string; name: string; color: string }> };
-          assignee: {
-            id: string;
-            displayName: string;
-            avatarUrl: string;
-          } | null;
-        }>;
-      };
-    };
-    errors?: Array<{ message: string }>;
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: { data?: { issues: { nodes: any[] } }; errors?: Array<{ message: string }> };
 
   try {
     const res = await linearFetch(apiKey, {
@@ -142,6 +144,26 @@ export async function GET(
     state: node.state,
     labels: node.labels.nodes,
     assignee: node.assignee,
+    comments: (node.comments?.nodes ?? []).map((c: any) => ({
+      id: c.id,
+      body: c.body,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      user: c.user,
+    })),
+    history: (node.history?.nodes ?? [])
+      .filter((h: any) => h.fromState || h.toState || h.fromPriority != null || h.toPriority != null || h.fromAssignee || h.toAssignee)
+      .map((h: any) => ({
+        id: h.id,
+        createdAt: h.createdAt,
+        fromState: h.fromState,
+        toState: h.toState,
+        fromPriority: h.fromPriority,
+        toPriority: h.toPriority,
+        fromAssignee: h.fromAssignee,
+        toAssignee: h.toAssignee,
+        actor: h.actor,
+      })),
     agentMeta,
   };
 
